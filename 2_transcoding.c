@@ -1,4 +1,3 @@
-#include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -6,6 +5,8 @@
 #include <libavutil/opt.h>
 #include <string.h>
 #include <inttypes.h>
+
+#include "./openGLShading.h"
 
 typedef struct _TranscodeContext {
   char *file_name;
@@ -108,12 +109,7 @@ int main(int argc, char *argv[])
 
 static void logging(const char *fmt, ...)
 {
-  va_list args;
-  fprintf( stderr, "LOG: " );
-  va_start( args, fmt );
-  vfprintf( stderr, fmt, args );
-  va_end( args );
-  fprintf( stderr, "\n" );
+
 }
 
 static int prepare_decoder(TranscodeContext *decoder_context) {
@@ -208,6 +204,7 @@ static int decode_packet(TranscodeContext *decoder_context, TranscodeContext *en
             frame->key_frame,
             frame->coded_picture_number
             );
+        frame = invertFrame(frame);
         encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[stream_index], frame, stream_index);
       }
       av_frame_unref(frame);
@@ -311,27 +308,6 @@ static int prepare_video_encoder(TranscodeContext *encoder_context, TranscodeCon
 
   encoder_context->stream[index]->time_base = encoder_context->codec_context[index]->time_base;
   return 0;
-}
-
-static int select_channel_layout(const AVCodec *codec)
-{
-  const uint64_t *p;
-  uint64_t best_ch_layout = 0;
-  int best_nb_channels = 0;
-  if (!codec->channel_layouts)
-    return AV_CH_LAYOUT_STEREO;
-  p = codec->channel_layouts;
-  while (*p)
-  {
-    int nb_channels = av_get_channel_layout_nb_channels(*p);
-    if (nb_channels > best_nb_channels)
-    {
-      best_ch_layout = *p;
-      best_nb_channels = nb_channels;
-    }
-    p++;
-  }
-  return best_ch_layout;
 }
 
 static int prepare_audio_copy(TranscodeContext *encoder_context, TranscodeContext *decoder_context) {
