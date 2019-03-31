@@ -1,3 +1,7 @@
 #include <libavcodec/avcodec.h>
 
-extern AVFrame *invertFrame(AVFrame *frame);
+extern void setupOpenGL(int width, int height);
+
+extern void invertFrame(AVFrame *inFrame, AVFrame *outFrame);
+
+extern void tearDownOpenGL(void);

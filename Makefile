@@ -5,7 +5,7 @@ hello_world: clean small_bunny_1080p_60fps.mp4
 	  && ./build/hello_world $(lastword $?)
 
 transcoding: clean
-	gcc -g -Wall -o build/transcoding -lavformat -lavcodec -lswscale -lz 2_transcoding.c \
+	gcc -g -Wall -o build/transcoding -lavformat -lavcodec -lswscale -lz -lglfw -framework OpenGL 2_transcoding.c openGLShading.c \
 	  && ./build/transcoding small_bunny_1080p_60fps.mp4 bunny_1s_gop.mp4
 
 clean:
