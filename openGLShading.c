@@ -1,5 +1,7 @@
 #include "openGLShading.h"
 
+#include <libavutil/pixdesc.h>
+
 #ifdef __APPLE__
 #include <OpenGL/gl3.h>
 #else
@@ -117,29 +119,16 @@ void setupOpenGL(int width, int height)
     textureLocation = tex_setup(program);
 }
 
-void invertFrame(AVFrame *inFrame, AVFrame *outFrame)
+void invertFrame(uint8_t *buffer, int width, int height)
 {
-    printf("invert frame\n");
-    if (outFrame->width < 1)
-    {
-        printf("setup frame\n");
-        outFrame->format = inFrame->format;
-        outFrame->width = inFrame->width;
-        outFrame->height = inFrame->height;
-        outFrame->channels = inFrame->channels;
-        outFrame->channel_layout = inFrame->channel_layout;
-        outFrame->nb_samples = inFrame->nb_samples;
-        av_frame_get_buffer(outFrame, 32);
-        av_frame_copy(outFrame, inFrame);
-        av_frame_copy_props(outFrame, inFrame);
-    }
-
     printf("setup texture\n");
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, inFrame->width, inFrame->height, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE, inFrame->data[0]);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0,
+                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, buffer);
     printf("draw arrays\n");
     glDrawArrays(GL_TRIANGLES, 0, 6);
     printf("read pixels\n");
-    glReadPixels(0, 0, inFrame->width, inFrame->height, PIXEL_FORMAT, GL_UNSIGNED_BYTE, (GLvoid *)outFrame->data[0]);
+    glReadPixels(0, 0, width, height, PIXEL_FORMAT,
+                 GL_UNSIGNED_BYTE, buffer);
 }
 
 void tearDownOpenGL()

@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "pixdesc.h": "c",
+        "inttypes.h": "c"
+    }
+}
