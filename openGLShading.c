@@ -21,21 +21,26 @@ GLFWwindow *window;
 static const float position[12] = {
     -1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f, 1.0f};
 
+static const float textureCoords[12] = {
+    0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f};
+
 #define PIXEL_FORMAT GL_RGB
 
 static const GLchar *v_shader_source =
     "attribute vec2 position;\n"
-    "varying vec2 texCoord;\n"
+    "attribute vec2 texCoord;\n"
+    "varying vec2 vTexCoord;\n"
     "void main(void) {\n"
     "  gl_Position = vec4(position, 0, 1);\n"
-    "  texCoord = position;\n"
+    "  vTexCoord = texCoord;\n"
     "}\n";
 
 static const GLchar *f_shader_source =
     "uniform sampler2D tex;\n"
-    "varying vec2 texCoord;\n"
+    "varying vec2 vTexCoord;\n"
     "void main() {\n"
-    "  gl_FragColor = texture2D(tex, texCoord);\n"
+    "vec4 kInvert = vec4(1, 1, 1, 0);\n"
+    "  gl_FragColor = kInvert - texture2D(tex, vTexCoord);\n"
     "}\n";
 
 static GLuint build_shader(const GLchar *shader_source, GLenum type)
@@ -101,6 +106,14 @@ static GLuint vbo_setup(GLuint programm)
     glBufferData(GL_ARRAY_BUFFER, sizeof(position), position, GL_STATIC_DRAW);
 
     GLint loc = glGetAttribLocation(program, "position");
+    glEnableVertexAttribArray(loc);
+    glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+    glGenBuffers(1, &positionBuf);
+    glBindBuffer(GL_ARRAY_BUFFER, positionBuf);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(textureCoords), textureCoords, GL_STATIC_DRAW);
+
+    loc = glGetAttribLocation(program, "texCoord");
     glEnableVertexAttribArray(loc);
     glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
     return positionBuf;
