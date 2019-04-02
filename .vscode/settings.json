@@ -1,6 +1,10 @@
 {
     "files.associations": {
         "pixdesc.h": "c",
-        "inttypes.h": "c"
+        "inttypes.h": "c",
+        "openglshading.h": "c",
+        "stdlib.h": "c",
+        "avformat.h": "c",
+        "imgutils.h": "c"
     }
 }

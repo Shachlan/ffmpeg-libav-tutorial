@@ -1,4 +1,4 @@
-#include <libavcodec/avcodec.h>
+#include <stdint.h>
 
 extern void setupOpenGL(int width, int height);
 
