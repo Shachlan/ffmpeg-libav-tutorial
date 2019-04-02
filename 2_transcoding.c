@@ -100,9 +100,9 @@ static int decode_packet(TranscodeContext *decoder_context, TranscodeContext *en
             inputFrame->key_frame,
             inputFrame->coded_picture_number);
 
-        //sws_scale(yuv_to_rgb_ctx, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, rgbaBuffer, lineSize);
+        sws_scale(yuv_to_rgb_ctx, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, rgbaBuffer, lineSize);
         printf("invert frame\n");
-        invertFrame(inputFrame->data[0], inputFrame->data[1], inputFrame->data[2], rgbaBuffer[0], inputFrame->width, inputFrame->height);
+        invertFrame(rgbaBuffer[0], inputFrame->width, inputFrame->height);
         printf("rescale\n");
         sws_scale(rgb_to_yuv_ctx, (const uint8_t *const *)rgbaBuffer, lineSize, 0, inputFrame->height, inputFrame->data, inputFrame->linesize);
         printf("encode frame\n");
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
   AVFrame *inputFrame = av_frame_alloc();
   uint8_t *outputBuffer[1];
   outputBuffer[0] = calloc(3 * height * width, sizeof(uint8_t));
-  int lineSize[] = {3 * width * sizeof(uint8_t), 0, 0, 0};
+  int lineSize[] = {3 * height * width, 0, 0, 0};
   const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(AV_PIX_FMT_RGB24);
 
   for (int i = 0; i < 4; i++)

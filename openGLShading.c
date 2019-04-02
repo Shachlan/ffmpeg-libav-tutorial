@@ -13,9 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-GLuint yTextureLocation;
-GLuint uTextureLocation;
-GLuint vTextureLocation;
+GLuint textureLocation;
 GLuint program;
 GLuint positionBuffers;
 GLFWwindow *window;
@@ -34,24 +32,12 @@ static const GLchar *v_shader_source =
     "}\n";
 
 static const GLchar *f_shader_source =
+    "uniform sampler2D tex;\n"
     "varying vec2 texCoord;\n"
-    "uniform sampler2D y_texture;\n"
-    "uniform sampler2D u_texture;\n"
-    "uniform sampler2D v_texture;\n"
     "const vec3 kInvert = vec3(1)\n"
     "void main() {\n"
-    "float r, g, b, y, u, v;\n"
-    "y = texture2D(y_texture, texCoord).r;\n "
-    "u = texture2D(u_texture, texCoord).r;\n "
-    "v = texture2D(v_texture, texCoord).r;\n "
-    "y = 1.1643 * (y - 0.0625);\n"
-    "u = u - 0.5;\n"
-    "v = v - 0.5;\n"
-    "r = y + 1.5958 * v;\n"
-    "g = y - 0.39173 * u - 0.81290 * v;\n"
-    "b = y + 2.017 * u;\n"
-    "vec3 invertedColor = kInvert - vec3(r,g,b);"
-    "gl_FragColor = vec4(invertedColor, 1);\n"
+    "  vec3 invertedColor = kInvert - texture2D(tex, texCoord).rgb;"
+    "  gl_FragColor = vec4(invertedColor, 1);\n"
     "}\n";
 
 static GLuint build_shader(const GLchar *shader_source, GLenum type)
@@ -93,11 +79,11 @@ static int build_program()
     return program;
 }
 
-static GLuint tex_setup(GLuint program, GLchar *name, GLint number, GLenum texture)
+static GLuint tex_setup(GLuint program)
 {
     GLuint textureLoc;
     glGenTextures(1, &textureLoc);
-    glActiveTexture(texture);
+    glActiveTexture(GL_TEXTURE0);
 
     glBindTexture(GL_TEXTURE_2D, textureLoc);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -105,7 +91,7 @@ static GLuint tex_setup(GLuint program, GLchar *name, GLint number, GLenum textu
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-    glUniform1i(glGetUniformLocation(program, name), number);
+    glUniform1i(glGetUniformLocation(program, "tex"), 0);
     return textureLoc;
 }
 
@@ -133,36 +119,25 @@ void setupOpenGL(int width, int height)
     program = build_program();
     glUseProgram(program);
     positionBuffers = vbo_setup(program);
-    yTextureLocation = tex_setup(program, "y_texture", 0, GL_TEXTURE0);
-    uTextureLocation = tex_setup(program, "u_texture", 1, GL_TEXTURE1);
-    vTextureLocation = tex_setup(program, "v_texture", 2, GL_TEXTURE2);
+    textureLocation = tex_setup(program);
 }
 
-void invertFrame(uint8_t *y, uint8_t *u, uint8_t *v, uint8_t *output, int width, int height)
+void invertFrame(uint8_t *buffer, int width, int height)
 {
-
     printf("setup texture\n");
-    glActiveTexture(GL_TEXTURE0);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R, width, height, 0,
-                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, y);
-    glActiveTexture(GL_TEXTURE1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R, width / 2, height, 0,
-                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, u);
-    glActiveTexture(GL_TEXTURE2);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R, width / 2, height, 0,
-                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, v);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0,
+                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, buffer);
     printf("draw arrays\n");
     glDrawArrays(GL_TRIANGLES, 0, 6);
     printf("read pixels\n");
-    glReadPixels(0, 0, width, height, PIXEL_FORMAT, GL_UNSIGNED_BYTE, output);
+    glReadPixels(0, 0, width, height, PIXEL_FORMAT,
+                 GL_UNSIGNED_BYTE, buffer);
 }
 
 void tearDownOpenGL()
 {
     printf("teardown\n");
-    glDeleteTextures(1, &yTextureLocation);
-    glDeleteTextures(1, &uTextureLocation);
-    glDeleteTextures(1, &vTextureLocation);
+    glDeleteTextures(1, &textureLocation);
     glDeleteProgram(program);
     glDeleteBuffers(1, &positionBuffers);
     glfwDestroyWindow(window);
