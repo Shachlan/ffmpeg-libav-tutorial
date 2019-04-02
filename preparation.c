@@ -10,12 +10,12 @@
 
 void logging(const char *fmt, ...)
 {
-    va_list args;
-    fprintf(stderr, "LOG: ");
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-    fprintf(stderr, "\n");
+    // va_list args;
+    // fprintf(stderr, "LOG: ");
+    // va_start(args, fmt);
+    // vfprintf(stderr, fmt, args);
+    // va_end(args);
+    // fprintf(stderr, "\n");
 }
 
 int prepare_decoder(TranscodeContext *decoder_context)
@@ -85,8 +85,8 @@ int prepare_decoder(TranscodeContext *decoder_context)
             return -1;
         }
     }
-    printf("first format: %s\n", av_get_pix_fmt_name(decoder_context->codec_context[0]->pix_fmt));
-    printf("second format: %s\n", av_get_pix_fmt_name(decoder_context->codec_context[1]->pix_fmt));
+    //printf("first format: %s\n", av_get_pix_fmt_name(decoder_context->codec_context[0]->pix_fmt));
+    //printf("second format: %s\n", av_get_pix_fmt_name(decoder_context->codec_context[1]->pix_fmt));
     return 0;
 }
 

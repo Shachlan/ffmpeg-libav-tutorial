@@ -34,10 +34,8 @@ static const GLchar *v_shader_source =
 static const GLchar *f_shader_source =
     "uniform sampler2D tex;\n"
     "varying vec2 texCoord;\n"
-    "const vec3 kInvert = vec3(1)\n"
     "void main() {\n"
-    "  vec3 invertedColor = kInvert - texture2D(tex, texCoord).rgb;"
-    "  gl_FragColor = vec4(invertedColor, 1);\n"
+    "  gl_FragColor = texture2D(tex, texCoord);\n"
     "}\n";
 
 static GLuint build_shader(const GLchar *shader_source, GLenum type)
@@ -73,7 +71,7 @@ static int build_program()
     glGetProgramiv(program, GL_LINK_STATUS, &status);
     if (status != GL_TRUE)
     {
-        printf("Error making program");
+        //printf("Error making program");
         exit(1);
     }
     return program;
@@ -110,7 +108,7 @@ static GLuint vbo_setup(GLuint programm)
 
 void setupOpenGL(int width, int height)
 {
-    printf("setup\n");
+    //printf("setup\n");
     glfwInit();
     glfwWindowHint(GLFW_VISIBLE, 0);
     window = glfwCreateWindow(width, height, "", NULL, NULL);
@@ -124,19 +122,19 @@ void setupOpenGL(int width, int height)
 
 void invertFrame(uint8_t *buffer, int width, int height)
 {
-    printf("setup texture\n");
+    //printf("setup texture\n");
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0,
                  PIXEL_FORMAT, GL_UNSIGNED_BYTE, buffer);
-    printf("draw arrays\n");
+    //printf("draw arrays\n");
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    printf("read pixels\n");
+    //printf("read pixels\n");
     glReadPixels(0, 0, width, height, PIXEL_FORMAT,
                  GL_UNSIGNED_BYTE, buffer);
 }
 
 void tearDownOpenGL()
 {
-    printf("teardown\n");
+    //printf("teardown\n");
     glDeleteTextures(1, &textureLocation);
     glDeleteProgram(program);
     glDeleteBuffers(1, &positionBuffers);
