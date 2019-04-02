@@ -61,8 +61,8 @@ static int encode_frame(TranscodeContext *decoder_context, TranscodeContext *enc
 }
 
 static int decode_packet(TranscodeContext *decoder_context, TranscodeContext *encoder_context,
-                         AVPacket *packet, AVFrame *inputFrame, uint8_t *rgbaBuffer[],
-                         int *lineSize, struct SwsContext *yuv_to_rgb_ctx, struct SwsContext *rgb_to_yuv_ctx, int stream_index)
+                         AVPacket *packet, AVFrame *inputFrame, AVFrame *outputFrame, uint8_t **outputBuffer, int *lineSize,
+                         struct SwsContext *yuv_to_rgb_ctx, struct SwsContext *rgb_to_yuv_ctx, int stream_index)
 {
   AVCodecContext *codec_context = decoder_context->codec_context[stream_index];
 
@@ -100,13 +100,14 @@ static int decode_packet(TranscodeContext *decoder_context, TranscodeContext *en
             inputFrame->key_frame,
             inputFrame->coded_picture_number);
 
-        sws_scale(yuv_to_rgb_ctx, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, rgbaBuffer, lineSize);
+        sws_scale(yuv_to_rgb_ctx, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
         //printf("invert frame\n");
-        invertFrame(rgbaBuffer[0], inputFrame->width, inputFrame->height);
+        invertFrame(outputBuffer[0], inputFrame->width, inputFrame->height);
         //printf("rescale\n");
-        sws_scale(rgb_to_yuv_ctx, (const uint8_t *const *)rgbaBuffer, lineSize, 0, inputFrame->height, inputFrame->data, inputFrame->linesize);
+        sws_scale(rgb_to_yuv_ctx, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
         //printf("encode frame\n");
-        encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[stream_index], inputFrame, stream_index);
+        outputFrame->pts = inputFrame->pts;
+        encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[stream_index], outputFrame, stream_index);
       }
       av_frame_unref(inputFrame);
     }
@@ -146,24 +147,19 @@ int main(int argc, char *argv[])
 
   //printf("initialize arrays\n");
   AVFrame *inputFrame = av_frame_alloc();
+  AVFrame *outputFrame = av_frame_alloc();
+  av_frame_copy_props(outputFrame, inputFrame);
+  outputFrame->width = width;
+  outputFrame->height = height;
+  outputFrame->format = AV_PIX_FMT_YUV420P;
+  av_image_alloc(outputFrame->data, outputFrame->linesize, width, height, AV_PIX_FMT_YUV420P, 1);
+  outputFrame->pict_type = AV_PICTURE_TYPE_I;
+
+  printf("pts: %d", outputFrame->pts);
+
   uint8_t *outputBuffer[1];
   outputBuffer[0] = calloc(3 * height * width, sizeof(uint8_t));
   int lineSize[] = {3 * width * sizeof(uint8_t), 0, 0, 0};
-  const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(AV_PIX_FMT_RGB24);
-
-  for (int i = 0; i < 4; i++)
-  {
-    int plane = desc->comp[i].plane;
-    if (!outputBuffer[plane])
-    {
-      //printf("undefined data at %d\n", i);
-    }
-    if (!lineSize[plane])
-    {
-      //printf("undefined linesize at %d\n", i);
-    }
-  }
-  //printf("data verified\n");
 
   if (!inputFrame)
   {
@@ -190,6 +186,7 @@ int main(int argc, char *argv[])
           encoder_context,
           input_packet,
           inputFrame,
+          outputFrame,
           outputBuffer,
           lineSize,
           yuv_to_rgb_ctx,
@@ -230,7 +227,7 @@ int main(int argc, char *argv[])
   avformat_free_context(decoder_context->format_context);
   av_packet_free(&input_packet);
   av_frame_free(&inputFrame);
-  free(outputBuffer[0]);
+  av_frame_free(&outputFrame);
   avcodec_free_context(&decoder_context->codec_context[0]);
   avcodec_free_context(&decoder_context->codec_context[1]);
   free(decoder_context);
