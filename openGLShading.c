@@ -26,22 +26,23 @@ static const float textureCoords[12] = {
 
 #define PIXEL_FORMAT GL_RGB
 
-static const GLchar *v_shader_source =
-    "attribute vec2 position;\n"
-    "attribute vec2 texCoord;\n"
-    "varying vec2 vTexCoord;\n"
-    "void main(void) {\n"
-    "  gl_Position = vec4(position, 0, 1);\n"
-    "  vTexCoord = texCoord;\n"
-    "}\n";
-
-static const GLchar *f_shader_source =
-    "uniform sampler2D tex;\n"
-    "varying vec2 vTexCoord;\n"
-    "void main() {\n"
-    "vec4 kInvert = vec4(1, 1, 1, 0);\n"
-    "  gl_FragColor = kInvert - texture2D(tex, vTexCoord);\n"
-    "}\n";
+static char *readFile(char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    fseek(file, 0, SEEK_END);
+    long length = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    char *text = calloc(length + 1, sizeof(char));
+    if (fread(text, length, 1, file) != 1)
+    {
+        printf("Failed to read file: %s", filename);
+        free(text);
+        fclose(file);
+        return NULL;
+    }
+    fclose(file);
+    return text;
+}
 
 static GLuint build_shader(const GLchar *shader_source, GLenum type)
 {
@@ -54,15 +55,27 @@ static GLuint build_shader(const GLchar *shader_source, GLenum type)
     glCompileShader(shader);
     GLint status;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-    return status == GL_TRUE ? shader : 0;
+    if (status == GL_TRUE)
+    {
+        return shader;
+    }
+    GLint logSize = 0;
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logSize);
+    GLchar *errorLog = calloc(logSize, sizeof(GLchar));
+    glGetShaderInfoLog(shader, logSize, NULL, errorLog);
+    printf("%s", errorLog);
+    free(errorLog);
+    return 0;
 }
 
 static int build_program()
 {
     GLuint v_shader, f_shader;
 
-    if (!((v_shader = build_shader(v_shader_source, GL_VERTEX_SHADER)) &&
-          (f_shader = build_shader(f_shader_source, GL_FRAGMENT_SHADER))))
+    char *vertex_shader = readFile("passthrough.vsh");
+    char *fragment_shader = readFile("invert.fsh");
+    if (!((v_shader = build_shader(vertex_shader, GL_VERTEX_SHADER)) &&
+          (f_shader = build_shader(fragment_shader, GL_FRAGMENT_SHADER))))
     {
         return -1;
     }

@@ -154,9 +154,7 @@ int main(int argc, char *argv[])
   outputFrame->format = AV_PIX_FMT_YUV420P;
   av_image_alloc(outputFrame->data, outputFrame->linesize, width, height, AV_PIX_FMT_YUV420P, 1);
   outputFrame->pict_type = AV_PICTURE_TYPE_I;
-
-  printf("pts: %d", outputFrame->pts);
-
+  
   uint8_t *outputBuffer[1];
   outputBuffer[0] = calloc(3 * height * width, sizeof(uint8_t));
   int lineSize[] = {3 * width * sizeof(uint8_t), 0, 0, 0};
