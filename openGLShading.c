@@ -13,9 +13,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-GLuint textureLocation;
-GLuint program;
-GLuint positionBuffers;
+typedef struct
+{
+    GLuint program;
+    int texture_count;
+    GLuint textures[15];
+    GLuint position_buffer;
+    GLuint texture_buffer;
+} ProgramInfo;
+
+ProgramInfo invert_program;
+ProgramInfo blend_program;
 GLFWwindow *window;
 
 static const float position[12] = {
@@ -68,12 +76,38 @@ static GLuint build_shader(const GLchar *shader_source, GLenum type)
     return 0;
 }
 
-static int build_program()
+static GLuint position_buffer_setup(GLuint program)
+{
+    GLuint positionBuf;
+    glGenBuffers(1, &positionBuf);
+    glBindBuffer(GL_ARRAY_BUFFER, positionBuf);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(position), position, GL_STATIC_DRAW);
+
+    GLint loc = glGetAttribLocation(program, "position");
+    glEnableVertexAttribArray(loc);
+    glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    return positionBuf;
+}
+
+static GLuint texture_buffer_setup(GLuint program)
+{
+    GLuint texturesBuffer;
+    glGenBuffers(1, &texturesBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, texturesBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(textureCoords), textureCoords, GL_STATIC_DRAW);
+
+    GLint loc = glGetAttribLocation(program, "texCoord");
+    glEnableVertexAttribArray(loc);
+    glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    return texturesBuffer;
+}
+
+static int build_program(char *vertex_shader_filename, char *fragment_shader_filename)
 {
     GLuint v_shader, f_shader;
 
-    char *vertex_shader = readFile("passthrough.vsh");
-    char *fragment_shader = readFile("invert.fsh");
+    char *vertex_shader = readFile(vertex_shader_filename);
+    char *fragment_shader = readFile(fragment_shader_filename);
     if (!((v_shader = build_shader(vertex_shader, GL_VERTEX_SHADER)) &&
           (f_shader = build_shader(fragment_shader, GL_FRAGMENT_SHADER))))
     {
@@ -111,25 +145,21 @@ static GLuint tex_setup(GLuint program)
     return textureLoc;
 }
 
-static GLuint vbo_setup(GLuint programm)
+ProgramInfo build_invert_program()
 {
-    GLuint positionBuf;
-    glGenBuffers(1, &positionBuf);
-    glBindBuffer(GL_ARRAY_BUFFER, positionBuf);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(position), position, GL_STATIC_DRAW);
-
-    GLint loc = glGetAttribLocation(program, "position");
-    glEnableVertexAttribArray(loc);
-    glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
-    glGenBuffers(1, &positionBuf);
-    glBindBuffer(GL_ARRAY_BUFFER, positionBuf);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(textureCoords), textureCoords, GL_STATIC_DRAW);
-
-    loc = glGetAttribLocation(program, "texCoord");
-    glEnableVertexAttribArray(loc);
-    glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    return positionBuf;
+    GLuint program = build_program("passthrough.vsh", "invert.fsh");
+    glUseProgram(program);
+    GLuint position_buffer = position_buffer_setup(program);
+    GLuint texture_buffer = texture_buffer_setup(program);
+    GLuint texture = tex_setup(program);
+    GLuint textures[15];
+    textures[0] = texture;
+    return (ProgramInfo){
+        program,
+        1,
+        textures,
+        position_buffer,
+        texture_buffer};
 }
 
 void setupOpenGL(int width, int height)
@@ -140,29 +170,28 @@ void setupOpenGL(int width, int height)
     window = glfwCreateWindow(width, height, "", NULL, NULL);
     glfwMakeContextCurrent(window);
     glViewport(0, 0, width, height);
-    program = build_program();
-    glUseProgram(program);
-    positionBuffers = vbo_setup(program);
-    textureLocation = tex_setup(program);
+    invert_program = build_invert_program();
 }
 
-void invertFrame(uint8_t *buffer, int width, int height)
+void invertFrame(TextureInfo tex)
 {
+    glUseProgram(invert_program.program);
     //printf("setup texture\n");
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0,
-                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, buffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex.width, tex.height, 0,
+                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, tex.buffer);
     //printf("draw arrays\n");
     glDrawArrays(GL_TRIANGLES, 0, 6);
     //printf("read pixels\n");
-    glReadPixels(0, 0, width, height, PIXEL_FORMAT,
-                 GL_UNSIGNED_BYTE, buffer);
+    glReadPixels(0, 0, tex.width, tex.height, PIXEL_FORMAT,
+                 GL_UNSIGNED_BYTE, tex.buffer);
 }
 
 void tearDownOpenGL()
 {
     //printf("teardown\n");
-    glDeleteTextures(1, &textureLocation);
-    glDeleteProgram(program);
-    glDeleteBuffers(1, &positionBuffers);
+    glDeleteTextures(invert_program.texture_count, invert_program.textures);
+    glDeleteProgram(invert_program.program);
+    glDeleteBuffers(1, &invert_program.position_buffer);
+    glDeleteBuffers(1, &invert_program.texture_buffer);
     glfwDestroyWindow(window);
 }

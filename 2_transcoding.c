@@ -102,7 +102,7 @@ static int decode_packet(TranscodeContext *decoder_context, TranscodeContext *en
 
         sws_scale(yuv_to_rgb_ctx, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
         //printf("invert frame\n");
-        invertFrame(outputBuffer[0], inputFrame->width, inputFrame->height);
+        invertFrame((TextureInfo){outputBuffer[0], inputFrame->width, inputFrame->height});
         //printf("rescale\n");
         sws_scale(rgb_to_yuv_ctx, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
         //printf("encode frame\n");
