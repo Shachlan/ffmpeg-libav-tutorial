@@ -184,12 +184,14 @@ int main(int argc, char *argv[])
     return -1;
   }
 
+  printf("all ok\n");
   int response = 0;
-  long time_base = decoder_context->stream[decoder_context->video_stream_index]->time_base;
+  AVRational time_base = decoder_context->stream[decoder_context->video_stream_index]->time_base;
   AVStream *secondary_video_stream = secondary_decoder->stream[secondary_decoder->video_stream_index];
-  long duration_in_seconds = secondary_video_stream->duration / secondary_video_stream->time_base;
-  long maxTime = wait + secondary_decoder->stream[secondary_decoder->video_stream_index]->duration;
-  printf("duration: %ld, max time: %ld", duration_in_seconds, maxTime);
+  AVRational secondary_time_base = secondary_video_stream->time_base;
+  long duration_in_seconds = (secondary_video_stream->duration * secondary_time_base.num) / secondary_time_base.den;
+  long maxTime = wait + duration_in_seconds;
+  printf("duration: %ld, max time: %ld\n", duration_in_seconds, maxTime);
 
   while (av_read_frame(decoder_context->format_context, input_packet) >= 0)
   {
@@ -210,7 +212,7 @@ int main(int argc, char *argv[])
       logging("\tfinish copying packets without reencoding");
       continue;
     }
-    long point_in_time = input_packet->pts / time_base;
+    long point_in_time = (input_packet->pts * time_base.den) / time_base.num;
 
     response = decode_single_packet(
         decoder_context,
