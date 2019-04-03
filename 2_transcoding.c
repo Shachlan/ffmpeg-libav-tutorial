@@ -60,9 +60,9 @@ static int encode_frame(TranscodeContext *decoder_context, TranscodeContext *enc
   return 0;
 }
 
-static int decode_packet(TranscodeContext *decoder_context, TranscodeContext *encoder_context,
-                         AVPacket *packet, AVFrame *inputFrame, AVFrame *outputFrame, uint8_t **outputBuffer, int *lineSize,
-                         struct SwsContext *yuv_to_rgb_ctx, struct SwsContext *rgb_to_yuv_ctx, int stream_index)
+static int decode_single_packet(TranscodeContext *decoder_context, TranscodeContext *encoder_context,
+                                AVPacket *packet, AVFrame *inputFrame, AVFrame *outputFrame, uint8_t **outputBuffer, int *lineSize,
+                                struct SwsContext *yuv_to_rgb_ctx, struct SwsContext *rgb_to_yuv_ctx, int stream_index)
 {
   AVCodecContext *codec_context = decoder_context->codec_context[stream_index];
 
@@ -126,18 +126,31 @@ int main(int argc, char *argv[])
     return -1;
   }
 
+  TranscodeContext *secondary_decoder = calloc(1, sizeof(TranscodeContext));
+  secondary_decoder->file_name = argv[2];
+
+  if (prepare_decoder(secondary_decoder))
+  {
+    logging("error while preparing secondary input");
+    return -1;
+  }
+
   TranscodeContext *encoder_context = calloc(1, sizeof(TranscodeContext));
-  encoder_context->file_name = argv[2];
+  encoder_context->file_name = argv[3];
 
   if (prepare_encoder(encoder_context, decoder_context))
   {
     logging("error while preparing output");
     return -1;
   }
+
+  float blendRatio = strtof(argv[4], NULL);
+  int wait = atoi(argv[5]);
+
   AVCodecContext *videoEncodingContext = encoder_context->codec_context[encoder_context->video_stream_index];
   int height = videoEncodingContext->height;
   int width = videoEncodingContext->width;
-  setupOpenGL(width, height);
+  setupOpenGL(width, height, blendRatio);
   struct SwsContext *yuv_to_rgb_ctx = sws_getContext(width, height, AV_PIX_FMT_YUV420P,
                                                      width, height, AV_PIX_FMT_RGB24,
                                                      SWS_BICUBIC, NULL, NULL, NULL);
@@ -154,7 +167,7 @@ int main(int argc, char *argv[])
   outputFrame->format = AV_PIX_FMT_YUV420P;
   av_image_alloc(outputFrame->data, outputFrame->linesize, width, height, AV_PIX_FMT_YUV420P, 1);
   outputFrame->pict_type = AV_PICTURE_TYPE_I;
-  
+
   uint8_t *outputBuffer[1];
   outputBuffer[0] = calloc(3 * height * width, sizeof(uint8_t));
   int lineSize[] = {3 * width * sizeof(uint8_t), 0, 0, 0};
@@ -172,31 +185,17 @@ int main(int argc, char *argv[])
   }
 
   int response = 0;
+  long time_base = decoder_context->stream[decoder_context->video_stream_index]->time_base;
+  AVStream *secondary_video_stream = secondary_decoder->stream[secondary_decoder->video_stream_index];
+  long duration_in_seconds = secondary_video_stream->duration / secondary_video_stream->time_base;
+  long maxTime = wait + secondary_decoder->stream[secondary_decoder->video_stream_index]->duration;
+  printf("duration: %ld, max time: %ld", duration_in_seconds, maxTime);
 
   while (av_read_frame(decoder_context->format_context, input_packet) >= 0)
   {
     logging("AVPacket->pts %" PRId64, input_packet->pts);
 
-    if (input_packet->stream_index == decoder_context->video_stream_index)
-    {
-      response = decode_packet(
-          decoder_context,
-          encoder_context,
-          input_packet,
-          inputFrame,
-          outputFrame,
-          outputBuffer,
-          lineSize,
-          yuv_to_rgb_ctx,
-          rgb_to_yuv_ctx,
-          input_packet->stream_index);
-
-      if (response < 0)
-        break;
-      //if (--how_many_packets_to_process <= 0) break;
-      av_packet_unref(input_packet);
-    }
-    else
+    if (input_packet->stream_index == decoder_context->audio_stream_index)
     {
       // just copying audio stream
       av_packet_rescale_ts(input_packet,
@@ -209,7 +208,26 @@ int main(int argc, char *argv[])
         return -1;
       }
       logging("\tfinish copying packets without reencoding");
+      continue;
     }
+    long point_in_time = input_packet->pts / time_base;
+
+    response = decode_single_packet(
+        decoder_context,
+        encoder_context,
+        input_packet,
+        inputFrame,
+        outputFrame,
+        outputBuffer,
+        lineSize,
+        yuv_to_rgb_ctx,
+        rgb_to_yuv_ctx,
+        input_packet->stream_index);
+
+    if (response < 0)
+      break;
+    //if (--how_many_packets_to_process <= 0) break;
+    av_packet_unref(input_packet);
   }
   // flush all frames
   encode_frame(decoder_context, encoder_context, encoder_context->format_context,
@@ -223,6 +241,8 @@ int main(int argc, char *argv[])
 
   avformat_close_input(&decoder_context->format_context);
   avformat_free_context(decoder_context->format_context);
+  avformat_close_input(&secondary_decoder->format_context);
+  avformat_free_context(secondary_decoder->format_context);
   av_packet_free(&input_packet);
   av_frame_free(&inputFrame);
   av_frame_free(&outputFrame);

@@ -157,12 +157,30 @@ ProgramInfo build_invert_program()
     return (ProgramInfo){
         program,
         1,
-        textures,
+        {*textures},
         position_buffer,
         texture_buffer};
 }
 
-void setupOpenGL(int width, int height)
+ProgramInfo build_blend_program(float blend_ratio)
+{
+    GLuint program = build_program("passthrough.vsh", "blend.fsh");
+    glUseProgram(program);
+    glUniform1f(glGetUniformLocation(program, "blendFactor"), blend_ratio);
+    GLuint position_buffer = position_buffer_setup(program);
+    GLuint texture_buffer = texture_buffer_setup(program);
+    GLuint textures[15];
+    textures[0] = tex_setup(program);
+    textures[1] = tex_setup(program);
+    return (ProgramInfo){
+        program,
+        2,
+        {*textures},
+        position_buffer,
+        texture_buffer};
+}
+
+void setupOpenGL(int width, int height, float blend_ratio)
 {
     //printf("setup\n");
     glfwInit();
@@ -171,11 +189,13 @@ void setupOpenGL(int width, int height)
     glfwMakeContextCurrent(window);
     glViewport(0, 0, width, height);
     invert_program = build_invert_program();
+    blend_program = build_blend_program(blend_ratio);
 }
 
 void invertFrame(TextureInfo tex)
 {
     glUseProgram(invert_program.program);
+    glActiveTexture(GL_TEXTURE0);
     //printf("setup texture\n");
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex.width, tex.height, 0,
                  PIXEL_FORMAT, GL_UNSIGNED_BYTE, tex.buffer);
@@ -184,6 +204,25 @@ void invertFrame(TextureInfo tex)
     //printf("read pixels\n");
     glReadPixels(0, 0, tex.width, tex.height, PIXEL_FORMAT,
                  GL_UNSIGNED_BYTE, tex.buffer);
+}
+
+extern void blendFrames(TextureInfo target, TextureInfo tex1, TextureInfo tex2)
+{
+    glUseProgram(invert_program.program);
+    glActiveTexture(GL_TEXTURE0);
+    //printf("setup texture\n");
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex1.width, tex1.height, 0,
+                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, tex1.buffer);
+
+    glActiveTexture(GL_TEXTURE1);
+    //printf("setup texture\n");
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex2.width, tex2.height, 0,
+                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, tex2.buffer);
+    //printf("draw arrays\n");
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    //printf("read pixels\n");
+    glReadPixels(0, 0, target.width, target.height, PIXEL_FORMAT,
+                 GL_UNSIGNED_BYTE, target.buffer);
 }
 
 void tearDownOpenGL()
