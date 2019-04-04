@@ -1,0 +1,13 @@
+[package]
+name = "openglrust"
+version = "0.1.0"
+authors = ["Shachar Langbeheim <shachar@lightricks.com>"]
+edition = "2018"
+
+[lib]
+name = "openglrust"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+glfw = "^0.2"
+libc = "^0.2"
