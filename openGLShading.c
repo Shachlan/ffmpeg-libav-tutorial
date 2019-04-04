@@ -129,11 +129,11 @@ static int build_program(char *vertex_shader_filename, char *fragment_shader_fil
     return program;
 }
 
-static GLuint tex_setup(GLuint program)
+static GLuint tex_setup(GLuint program, GLenum texture, GLchar *textureName, int textureNum)
 {
     GLuint textureLoc;
     glGenTextures(1, &textureLoc);
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(texture);
 
     glBindTexture(GL_TEXTURE_2D, textureLoc);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -141,7 +141,7 @@ static GLuint tex_setup(GLuint program)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-    glUniform1i(glGetUniformLocation(program, "tex"), 0);
+    glUniform1i(glGetUniformLocation(program, textureName), textureNum);
     return textureLoc;
 }
 
@@ -151,7 +151,7 @@ ProgramInfo build_invert_program()
     glUseProgram(program);
     GLuint position_buffer = position_buffer_setup(program);
     GLuint texture_buffer = texture_buffer_setup(program);
-    GLuint texture = tex_setup(program);
+    GLuint texture = tex_setup(program, GL_TEXTURE0, "tex", 0);
     GLuint textures[15];
     textures[0] = texture;
     return (ProgramInfo){
@@ -170,8 +170,8 @@ ProgramInfo build_blend_program(float blend_ratio)
     GLuint position_buffer = position_buffer_setup(program);
     GLuint texture_buffer = texture_buffer_setup(program);
     GLuint textures[15];
-    textures[0] = tex_setup(program);
-    textures[1] = tex_setup(program);
+    textures[0] = tex_setup(program, GL_TEXTURE0, "tex1", 0);
+    textures[1] = tex_setup(program, GL_TEXTURE1, "tex2", 1);
     return (ProgramInfo){
         program,
         2,

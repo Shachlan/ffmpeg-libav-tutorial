@@ -173,6 +173,7 @@ int main(int argc, char *argv[])
   }
 
   float blendRatio = strtof(argv[4], NULL);
+  printf("blend ratio: %f\n", blendRatio);
   int wait = atoi(argv[5]);
 
   AVCodecContext *videoEncodingContext = encoder_context->codec_context[encoder_context->video_stream_index];
@@ -281,7 +282,6 @@ int main(int argc, char *argv[])
         int response = decode_single_packet(
             secondary_decoder, input_packet,
             secondary_input_frame, input_packet->stream_index);
-        av_packet_unref(input_packet);
         if (response == AVERROR(EAGAIN) || response == AVERROR_EOF)
         {
           continue;
@@ -294,11 +294,14 @@ int main(int argc, char *argv[])
 
         last_secondary_pts = multiply_by_int(secondary_time_base, input_packet->pts);
         next_secondary_pts = multiply_by_int(secondary_time_base, input_packet->pts + input_packet->duration);
+        av_packet_unref(input_packet);
         break;
       }
     }
 
-    blend_frames(inputFrame, secondary_input_frame, outputFrame, outputBuffer, lineSize, secondary_buffer, secondary_lineSize, input_conversion_context, output_conversion_context, secondary_input_conversion_context);
+    blend_frames(inputFrame, secondary_input_frame, outputFrame,
+                 outputBuffer, lineSize, secondary_buffer, secondary_lineSize,
+                 input_conversion_context, output_conversion_context, secondary_input_conversion_context);
     encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[input_packet->stream_index], outputFrame, input_packet->stream_index);
     av_frame_unref(inputFrame);
     av_frame_unref(secondary_input_frame);
