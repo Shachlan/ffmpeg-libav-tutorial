@@ -9,6 +9,7 @@
 
 #include "./preparation.h"
 #include "./openGLShading.h"
+#include "./rationalExtensions.h"
 
 static int encode_frame(TranscodeContext *decoder_context, TranscodeContext *encoder_context, AVFormatContext *format_context, AVCodecContext *codec_context, AVFrame *frame, int stream_index)
 {
@@ -61,14 +62,29 @@ static int encode_frame(TranscodeContext *decoder_context, TranscodeContext *enc
 }
 
 static void invert_single_frame(AVFrame *inputFrame, AVFrame *outputFrame, uint8_t **outputBuffer, int *lineSize,
-                                struct SwsContext *yuv_to_rgb_ctx, struct SwsContext *rgb_to_yuv_ctx)
+                                struct SwsContext *input_conversion_context, struct SwsContext *output_conversion_context)
 {
   outputFrame->pts = inputFrame->pts;
-  sws_scale(yuv_to_rgb_ctx, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
+  sws_scale(input_conversion_context, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
   //printf("invert frame\n");
   invertFrame((TextureInfo){outputBuffer[0], inputFrame->width, inputFrame->height});
   //printf("rescale\n");
-  sws_scale(rgb_to_yuv_ctx, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
+  sws_scale(output_conversion_context, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
+}
+
+static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame, AVFrame *outputFrame,
+                         uint8_t **outputBuffer, int *lineSize, uint8_t **secondary_buffer, int *secondary_linesize,
+                         struct SwsContext *input_conversion_context, struct SwsContext *output_conversion_context, struct SwsContext *secondary_conversion_context)
+{
+  outputFrame->pts = inputFrame->pts;
+  sws_scale(input_conversion_context, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
+  sws_scale(secondary_conversion_context, (const uint8_t *const *)secondary_input_frame->data, secondary_input_frame->linesize, 0, secondary_input_frame->height, secondary_buffer, secondary_linesize);
+  //printf("invert frame\n");
+  blendFrames((TextureInfo){outputBuffer[0], inputFrame->width, inputFrame->height},
+              (TextureInfo){outputBuffer[0], inputFrame->width, inputFrame->height},
+              (TextureInfo){secondary_buffer[0], secondary_input_frame->width, secondary_input_frame->height});
+  //printf("rescale\n");
+  sws_scale(output_conversion_context, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
 }
 
 static int decode_single_packet(TranscodeContext *decoder_context, AVPacket *packet, AVFrame *inputFrame, int stream_index)
@@ -83,6 +99,48 @@ static int decode_single_packet(TranscodeContext *decoder_context, AVPacket *pac
   }
 
   return avcodec_receive_frame(codec_context, inputFrame);
+}
+
+struct SwsContext *conversion_context_from_codec_to_rgb(AVCodecContext *context)
+{
+  int height = context->height;
+  int width = context->width;
+  return sws_getContext(width, height, context->pix_fmt,
+                        width, height, AV_PIX_FMT_RGB24,
+                        SWS_BICUBIC, NULL, NULL, NULL);
+}
+
+struct SwsContext *conversion_context_from_rgb_to_codec(AVCodecContext *context)
+{
+  int height = context->height;
+  int width = context->width;
+  return sws_getContext(width, height, AV_PIX_FMT_RGB24,
+                        width, height, context->pix_fmt,
+                        SWS_BICUBIC, NULL, NULL, NULL);
+}
+
+int *linesize_for_size(int width)
+{
+  int *linesize = calloc(4, sizeof(int));
+  linesize[0] = 3 * width * sizeof(uint8_t);
+  return linesize;
+}
+
+int *linesize_for_codec(AVCodecContext *context)
+{
+  return linesize_for_size(context->width);
+}
+
+uint8_t **rgb_buffer_for_size(int width, int height)
+{
+  uint8_t **buffer = calloc(1, sizeof(uint8_t *));
+  buffer[0] = calloc(3 * height * width, sizeof(uint8_t));
+  return buffer;
+}
+
+uint8_t **rgb_buffer_for_codec(AVCodecContext *context)
+{
+  return rgb_buffer_for_size(context->width, context->height);
 }
 
 int main(int argc, char *argv[])
@@ -118,18 +176,18 @@ int main(int argc, char *argv[])
   int wait = atoi(argv[5]);
 
   AVCodecContext *videoEncodingContext = encoder_context->codec_context[encoder_context->video_stream_index];
+  AVCodecContext *secondary_video_context = secondary_decoder->codec_context[secondary_decoder->video_stream_index];
   int height = videoEncodingContext->height;
   int width = videoEncodingContext->width;
   setupOpenGL(width, height, blendRatio);
-  struct SwsContext *yuv_to_rgb_ctx = sws_getContext(width, height, AV_PIX_FMT_YUV420P,
-                                                     width, height, AV_PIX_FMT_RGB24,
-                                                     SWS_BICUBIC, NULL, NULL, NULL);
-  struct SwsContext *rgb_to_yuv_ctx = sws_getContext(width, height, AV_PIX_FMT_RGB24,
-                                                     width, height, AV_PIX_FMT_YUV420P,
-                                                     SWS_BICUBIC, NULL, NULL, NULL);
+  struct SwsContext *input_conversion_context = conversion_context_from_codec_to_rgb(videoEncodingContext);
+  struct SwsContext *secondary_input_conversion_context = conversion_context_from_codec_to_rgb(secondary_video_context);
+  struct SwsContext *output_conversion_context = conversion_context_from_rgb_to_codec(videoEncodingContext);
+  AVStream *secondary_video_stream = secondary_decoder->stream[secondary_decoder->video_stream_index];
 
   //printf("initialize arrays\n");
   AVFrame *inputFrame = av_frame_alloc();
+  AVFrame *secondary_input_frame = av_frame_alloc();
   AVFrame *outputFrame = av_frame_alloc();
   av_frame_copy_props(outputFrame, inputFrame);
   outputFrame->width = width;
@@ -138,9 +196,12 @@ int main(int argc, char *argv[])
   av_image_alloc(outputFrame->data, outputFrame->linesize, width, height, AV_PIX_FMT_YUV420P, 1);
   outputFrame->pict_type = AV_PICTURE_TYPE_I;
 
-  uint8_t *outputBuffer[1];
-  outputBuffer[0] = calloc(3 * height * width, sizeof(uint8_t));
-  int lineSize[] = {3 * width * sizeof(uint8_t), 0, 0, 0};
+  printf("allocating arrays\n");
+  uint8_t **outputBuffer = rgb_buffer_for_codec(videoEncodingContext);
+  uint8_t **secondary_buffer = rgb_buffer_for_codec(secondary_video_context);
+  int *lineSize = linesize_for_codec(videoEncodingContext);
+  int *secondary_lineSize = linesize_for_codec(secondary_video_context);
+  printf("finished allocating arrays\n");
 
   if (!inputFrame)
   {
@@ -154,14 +215,13 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  printf("all ok\n");
-  int response = 0;
   AVRational time_base = decoder_context->stream[decoder_context->video_stream_index]->time_base;
-  AVStream *secondary_video_stream = secondary_decoder->stream[secondary_decoder->video_stream_index];
   AVRational secondary_time_base = secondary_video_stream->time_base;
-  long duration_in_seconds = (secondary_video_stream->duration * secondary_time_base.num) / secondary_time_base.den;
-  long maxTime = wait + duration_in_seconds;
-  printf("duration: %ld, max time: %ld\n", duration_in_seconds, maxTime);
+  double duration_in_seconds = av_q2d(multiply_by_int(secondary_time_base, secondary_video_stream->duration));
+  double maxTime = duration_in_seconds + wait;
+  printf("duration: %lf, max time: %lf, wait: %d\n", duration_in_seconds, maxTime, wait);
+  AVRational last_secondary_pts = av_make_q(INT16_MIN, 1);
+  AVRational next_secondary_pts = av_make_q(0, 1);
 
   while (av_read_frame(decoder_context->format_context, input_packet) >= 0)
   {
@@ -180,9 +240,9 @@ int main(int argc, char *argv[])
         return -1;
       }
       logging("\tfinish copying packets without reencoding");
+      av_packet_unref(input_packet);
       continue;
     }
-    long point_in_time = (input_packet->pts * time_base.den) / time_base.num;
 
     int response = decode_single_packet(
         decoder_context, input_packet,
@@ -196,16 +256,53 @@ int main(int argc, char *argv[])
       logging("DECODER: Error while receiving a frame from the decoder: %s", av_err2str(response));
       return response;
     }
+    AVRational current_pos = multiply_by_int(time_base, input_packet->pts);
+    av_packet_unref(input_packet);
+    double point_in_time = av_q2d(current_pos);
 
-    if (response >= 0)
+    if (point_in_time < wait || point_in_time > maxTime)
     {
-      invert_single_frame(inputFrame, outputFrame, outputBuffer, lineSize, yuv_to_rgb_ctx, rgb_to_yuv_ctx);
+      invert_single_frame(inputFrame, outputFrame, outputBuffer, lineSize, input_conversion_context, output_conversion_context);
       encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[input_packet->stream_index], outputFrame, input_packet->stream_index);
       av_frame_unref(inputFrame);
+      continue;
     }
 
+    AVRational adjustedPos = subtract_int(current_pos, wait);
+    if (av_nearer_q(adjustedPos, last_secondary_pts, next_secondary_pts) == -1)
+    {
+      while (av_read_frame(secondary_decoder->format_context, input_packet) >= 0)
+      {
+        if (input_packet->stream_index != secondary_video_stream->index)
+        {
+          av_packet_unref(input_packet);
+          continue;
+        }
+        int response = decode_single_packet(
+            secondary_decoder, input_packet,
+            secondary_input_frame, input_packet->stream_index);
+        av_packet_unref(input_packet);
+        if (response == AVERROR(EAGAIN) || response == AVERROR_EOF)
+        {
+          continue;
+        }
+        if (response < 0)
+        {
+          logging("DECODER: Error while receiving a frame from the decoder: %s", av_err2str(response));
+          return response;
+        }
+
+        last_secondary_pts = multiply_by_int(secondary_time_base, input_packet->pts);
+        next_secondary_pts = multiply_by_int(secondary_time_base, input_packet->pts + input_packet->duration);
+        break;
+      }
+    }
+
+    blend_frames(inputFrame, secondary_input_frame, outputFrame, outputBuffer, lineSize, secondary_buffer, secondary_lineSize, input_conversion_context, output_conversion_context, secondary_input_conversion_context);
+    encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[input_packet->stream_index], outputFrame, input_packet->stream_index);
+    av_frame_unref(inputFrame);
+    av_frame_unref(secondary_input_frame);
     //if (--how_many_packets_to_process <= 0) break;
-    av_packet_unref(input_packet);
   }
   // flush all frames
   encode_frame(decoder_context, encoder_context, encoder_context->format_context,

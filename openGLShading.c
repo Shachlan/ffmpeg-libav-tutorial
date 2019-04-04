@@ -208,7 +208,7 @@ void invertFrame(TextureInfo tex)
 
 extern void blendFrames(TextureInfo target, TextureInfo tex1, TextureInfo tex2)
 {
-    glUseProgram(invert_program.program);
+    glUseProgram(blend_program.program);
     glActiveTexture(GL_TEXTURE0);
     //printf("setup texture\n");
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex1.width, tex1.height, 0,

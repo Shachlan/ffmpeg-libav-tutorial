@@ -15,12 +15,12 @@ AVRational multiply_by_int(AVRational rational, long mult)
     return make_rounded(rational.num * mult, rational.den);
 }
 
-AVRational subtract_int(AVRational rational, long subtracted)
-{
-    return av_sub_q(rational, av_make_q(subtracted, 1));
-}
-
 AVRational add_int(AVRational rational, long added)
 {
     return av_add_q(rational, av_make_q(added, 1));
+}
+
+AVRational subtract_int(AVRational rational, long subtracted)
+{
+    return av_sub_q(rational, av_make_q(subtracted, 1));
 }
