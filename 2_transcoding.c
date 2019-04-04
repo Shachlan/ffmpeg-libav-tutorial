@@ -60,12 +60,20 @@ static int encode_frame(TranscodeContext *decoder_context, TranscodeContext *enc
   return 0;
 }
 
-static int decode_single_packet(TranscodeContext *decoder_context, TranscodeContext *encoder_context,
-                                AVPacket *packet, AVFrame *inputFrame, AVFrame *outputFrame, uint8_t **outputBuffer, int *lineSize,
-                                struct SwsContext *yuv_to_rgb_ctx, struct SwsContext *rgb_to_yuv_ctx, int stream_index)
+static void invert_single_frame(AVFrame *inputFrame, AVFrame *outputFrame, uint8_t **outputBuffer, int *lineSize,
+                                struct SwsContext *yuv_to_rgb_ctx, struct SwsContext *rgb_to_yuv_ctx)
+{
+  outputFrame->pts = inputFrame->pts;
+  sws_scale(yuv_to_rgb_ctx, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
+  //printf("invert frame\n");
+  invertFrame((TextureInfo){outputBuffer[0], inputFrame->width, inputFrame->height});
+  //printf("rescale\n");
+  sws_scale(rgb_to_yuv_ctx, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
+}
+
+static int decode_single_packet(TranscodeContext *decoder_context, AVPacket *packet, AVFrame *inputFrame, int stream_index)
 {
   AVCodecContext *codec_context = decoder_context->codec_context[stream_index];
-
   int response = avcodec_send_packet(codec_context, packet);
 
   if (response < 0)
@@ -74,45 +82,7 @@ static int decode_single_packet(TranscodeContext *decoder_context, TranscodeCont
     return response;
   }
 
-  while (response >= 0)
-  {
-    response = avcodec_receive_frame(codec_context, inputFrame);
-    if (response == AVERROR(EAGAIN) || response == AVERROR_EOF)
-    {
-      break;
-    }
-    else if (response < 0)
-    {
-      logging("DECODER: Error while receiving a frame from the decoder: %s", av_err2str(response));
-      return response;
-    }
-
-    if (response >= 0)
-    {
-      if (codec_context->codec_type == AVMEDIA_TYPE_VIDEO)
-      {
-        logging(
-            "\tEncoding VIDEO Frame %d (type=%c, size=%d bytes) pts %d key_frame %d [DTS %d]",
-            codec_context->frame_number,
-            av_get_picture_type_char(inputFrame->pict_type),
-            inputFrame->pkt_size,
-            inputFrame->pts,
-            inputFrame->key_frame,
-            inputFrame->coded_picture_number);
-
-        sws_scale(yuv_to_rgb_ctx, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
-        //printf("invert frame\n");
-        invertFrame((TextureInfo){outputBuffer[0], inputFrame->width, inputFrame->height});
-        //printf("rescale\n");
-        sws_scale(rgb_to_yuv_ctx, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
-        //printf("encode frame\n");
-        outputFrame->pts = inputFrame->pts;
-        encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[stream_index], outputFrame, stream_index);
-      }
-      av_frame_unref(inputFrame);
-    }
-  }
-  return 0;
+  return avcodec_receive_frame(codec_context, inputFrame);
 }
 
 int main(int argc, char *argv[])
@@ -214,20 +184,26 @@ int main(int argc, char *argv[])
     }
     long point_in_time = (input_packet->pts * time_base.den) / time_base.num;
 
-    response = decode_single_packet(
-        decoder_context,
-        encoder_context,
-        input_packet,
-        inputFrame,
-        outputFrame,
-        outputBuffer,
-        lineSize,
-        yuv_to_rgb_ctx,
-        rgb_to_yuv_ctx,
-        input_packet->stream_index);
+    int response = decode_single_packet(
+        decoder_context, input_packet,
+        inputFrame, input_packet->stream_index);
+    if (response == AVERROR(EAGAIN) || response == AVERROR_EOF)
+    {
+      continue;
+    }
+    else if (response < 0)
+    {
+      logging("DECODER: Error while receiving a frame from the decoder: %s", av_err2str(response));
+      return response;
+    }
 
-    if (response < 0)
-      break;
+    if (response >= 0)
+    {
+      invert_single_frame(inputFrame, outputFrame, outputBuffer, lineSize, yuv_to_rgb_ctx, rgb_to_yuv_ctx);
+      encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[input_packet->stream_index], outputFrame, input_packet->stream_index);
+      av_frame_unref(inputFrame);
+    }
+
     //if (--how_many_packets_to_process <= 0) break;
     av_packet_unref(input_packet);
   }
