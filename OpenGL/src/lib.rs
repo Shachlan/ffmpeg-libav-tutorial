@@ -11,7 +11,10 @@ use shader::Shader;
 use libc::c_float;
 use libc::c_int;
 use libc::c_char;
+use std::ffi::{CString, CStr};
 use std;
+use std::mem;
+use std::str;
 
 #[repr(C)]
 pub struct TextureInfo
@@ -22,36 +25,90 @@ pub struct TextureInfo
 }
 
 struct ProgramInfo {
-    program: isize,
-    position_buffers: isize,
-    texture_buffer: isize
+    program: Shader,
+    position_buffer: u32,
+    texture_buffer: u32
 }
 
-const position: [f32; 12] = [ -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0];
+const POSITION: [f32; 12] = [ -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0];
 
-const textureCoords: [f32; 12] = [ 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0];
+const TEXTURE_COORDS: [f32; 12] = [ 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0];
 
 static mut invert_program: ProgramInfo = ProgramInfo {
-        program: -1, position_buffers:-1, texture_buffer:-1
+        program: Shader { ID: 0 }, position_buffer:0, texture_buffer:0
     };
 static mut blend_program: ProgramInfo = ProgramInfo {
-        program: -1, position_buffers:-1, texture_buffer:-1
+        program: Shader { ID: 0 }, position_buffer:0, texture_buffer:0
     };
 
 static mut window: *const glfw::Window = std::ptr::null();
 static mut texture1: u32 = 0;
 static mut texture2: u32 = 0;
 
-fn build_program(vertex_shader_filename: &str, fragment_shader_filename: &str) {
-
+fn to_string(source: &str) -> &CStr {
+    unsafe {
+    CStr::from_ptr(CString::new(source).unwrap().as_ptr())
+    }
 }
 
-fn setupBlendingProgram() {
+fn setup_texture_buffer(program: u32) -> u32 {
+    let mut texture_buffer = 0;
+    unsafe {
+    gl::GenBuffers(1, &mut texture_buffer);
+    gl::BindBuffer(gl::ARRAY_BUFFER, texture_buffer);
+    gl::BufferData(gl::ARRAY_BUFFER, 
+        (TEXTURE_COORDS.len() * mem::size_of::<GLfloat>()) as GLsizeiptr, 
+        mem::transmute(&TEXTURE_COORDS[0]),
+        gl::STATIC_DRAW);
+
+    let loc = gl::GetAttribLocation(program, CString::new("texCoord").unwrap().as_ptr()) as GLuint;
+    gl::EnableVertexAttribArray(loc);
+    gl::VertexAttribPointer(loc, 2, gl::FLOAT, gl::FALSE, 0, 0 as *const GLvoid);
+    }
+
+    texture_buffer
+}
+
+fn setup_position_buffer(program: u32) -> u32 {
+    let mut position_buffer = 0;
+    unsafe {
+    gl::GenBuffers(1, &mut position_buffer);
+    gl::BindBuffer(gl::ARRAY_BUFFER, position_buffer);
+    gl::BufferData(gl::ARRAY_BUFFER, 
+        (POSITION.len() * mem::size_of::<GLfloat>()) as GLsizeiptr, 
+        mem::transmute(&POSITION[0]),
+        gl::STATIC_DRAW);
+
+    let loc = gl::GetAttribLocation(program, CString::new("position").unwrap().as_ptr()) as GLuint;
+    gl::EnableVertexAttribArray(loc);
+    gl::VertexAttribPointer(loc, 2, gl::FLOAT, gl::FALSE, 0, 0 as *const GLvoid);
+    }
+
+    position_buffer
+}
+
+fn setup_blending_program(blend_ratio: f32) {
     let program = Shader::new("passthrough.vsh", "blend.fsh");
+    let ID = program.ID;
+    unsafe {
+        blend_program.position_buffer = setup_position_buffer(ID);
+        blend_program.texture_buffer = setup_texture_buffer(ID);
+        program.setInt(to_string("tex1"), texture1 as i32);
+        program.setInt(to_string("tex2"), texture2 as i32);
+        program.setFloat(to_string("blendFactor"), blend_ratio);
+        blend_program.program = program;
+    }
 }
 
-fn setupInvertProgram() {
-    //glUniform1i(glGetUniformLocation(program, textureName), textureNum);
+fn setup_invert_program() {
+    let program = Shader::new("passthrough.vsh", "invert.fsh");
+    let ID = program.ID;
+    unsafe {
+        invert_program.position_buffer = setup_position_buffer(ID);
+        invert_program.texture_buffer = setup_texture_buffer(ID);
+        program.setInt(to_string("tex1"), texture1 as i32);
+        invert_program.program = program;
+    }
 }
 
 fn tex_setup() -> u32
@@ -78,29 +135,33 @@ pub extern "C" fn setupOpenGL(width: c_int, height: c_int, blend_ratio: c_float)
     // glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
     // glfw.window_hint(glfw::WindowHint::OpenGlProfile(glfw::OpenGlProfileHint::Core));
     glfw.window_hint(glfw::WindowHint::Visible(false));
-    let (mut internalWindow, events) = glfw.create_window(width as u32, height as u32, "", glfw::WindowMode::Windowed)
+    let (mut internal_window, events) = glfw.create_window(width as u32, height as u32, "", glfw::WindowMode::Windowed)
         .expect("Failed to create GLFW window.");
     unsafe {
-        window = &internalWindow;
-        internalWindow.make_current();
-        gl::load_with(|symbol| internalWindow.get_proc_address(symbol) as *const _);
+        window = &internal_window;
+        internal_window.make_current();
+        gl::load_with(|symbol| internal_window.get_proc_address(symbol) as *const _);
         gl::Viewport(0, 0, width, height); 
         texture1 = tex_setup();
         texture2 = tex_setup();
     }
 
-    setupBlendingProgram();
-    setupInvertProgram();
+    setup_blending_program(blend_ratio);
+    setup_invert_program();
 }
 
 #[no_mangle]
 pub extern "C" fn invertFrame(tex: TextureInfo) {
-    //println!("invertFrame");
+    unsafe{
+        invert_program.program.useProgram();
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn blendFrames(target: TextureInfo, tex1: TextureInfo, tex2: TextureInfo) {
-//println!("blendFrames");
+    unsafe{
+        blend_program.program.useProgram();
+    }
 }
 
 #[no_mangle]
