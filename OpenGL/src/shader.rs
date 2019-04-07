@@ -56,9 +56,6 @@ impl Shader {
             gl::AttachShader(ID, fragment);
             gl::LinkProgram(ID);
             shader.checkCompileErrors(ID, "PROGRAM");
-            // delete the shaders as they're linked into our program now and no longer necessary
-            gl::DeleteShader(vertex);
-            gl::DeleteShader(fragment);
             shader.ID = ID;
         }
 
