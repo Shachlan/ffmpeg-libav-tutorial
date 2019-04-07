@@ -44,6 +44,7 @@ static mut blend_program: ProgramInfo = ProgramInfo {
 static mut window: *const glfw::Window = std::ptr::null();
 static mut texture1: u32 = 0;
 static mut texture2: u32 = 0;
+static mut texture3: u32 = 0;
 
 fn to_string(source: &str) -> &CStr {
     unsafe {
@@ -93,8 +94,8 @@ fn setup_blending_program(blend_ratio: f32) {
     unsafe {
         blend_program.position_buffer = setup_position_buffer(ID);
         blend_program.texture_buffer = setup_texture_buffer(ID);
-        program.setInt(to_string("tex1"), texture1 as i32);
-        program.setInt(to_string("tex2"), texture2 as i32);
+        texture1 = tex_setup(ID, gl::TEXTURE0, to_string("tex1"), 0);
+        texture2 = tex_setup(ID, gl::TEXTURE1, to_string("tex2"), 1);
         program.setFloat(to_string("blendFactor"), blend_ratio);
         blend_program.program = program;
     }
@@ -106,17 +107,18 @@ fn setup_invert_program() {
     unsafe {
         invert_program.position_buffer = setup_position_buffer(ID);
         invert_program.texture_buffer = setup_texture_buffer(ID);
-        program.setInt(to_string("tex1"), texture1 as i32);
+        gl::ActiveTexture(gl::TEXTURE0);
+        texture3 = tex_setup(ID, gl::TEXTURE0, to_string("tex1"), 0);
         invert_program.program = program;
     }
 }
 
-fn tex_setup() -> u32
+fn tex_setup(program: u32, texEnum: u32, textureName: &CStr, textureNum: i32) -> u32
 {
     unsafe {
         let mut texture = 0;
-        gl::ActiveTexture(texture);
         gl::GenTextures(1, &mut texture);
+        gl::ActiveTexture(texEnum);
         gl::BindTexture(gl::TEXTURE_2D, texture);
 
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32); 
@@ -124,6 +126,7 @@ fn tex_setup() -> u32
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
 
+        gl::Uniform1i(gl::GetUniformLocation(program, textureName.as_ptr()), textureNum);
         texture
     }
 }
@@ -142,25 +145,45 @@ pub extern "C" fn setupOpenGL(width: c_int, height: c_int, blend_ratio: c_float)
         internal_window.make_current();
         gl::load_with(|symbol| internal_window.get_proc_address(symbol) as *const _);
         gl::Viewport(0, 0, width, height); 
-        texture1 = tex_setup();
-        texture2 = tex_setup();
     }
 
     setup_blending_program(blend_ratio);
     setup_invert_program();
 }
 
+fn load_texture(tex: &TextureInfo) {
+    unsafe {
+        gl::TexImage2D(gl::TEXTURE_2D, 0,
+            gl::RGB as i32, tex.width, tex.height,
+            0, gl::RGB, gl::UNSIGNED_BYTE, 
+            tex.buffer as *const GLvoid);
+        
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn invertFrame(tex: TextureInfo) {
     unsafe{
         invert_program.program.useProgram();
+        gl::ActiveTexture(gl::TEXTURE0);
+        load_texture(&tex);
+        gl::DrawArrays(gl::TRIANGLES, 0, 6);
+        gl::ReadPixels(0, 0, tex.width, tex.height, gl::RGB, gl::UNSIGNED_BYTE, tex.buffer as *mut GLvoid);
     }
 }
 
 #[no_mangle]
 pub extern "C" fn blendFrames(target: TextureInfo, tex1: TextureInfo, tex2: TextureInfo) {
     unsafe{
+        println!("order is: {},{},{}", target.identifier, tex1.identifier, tex2.identifier);
         blend_program.program.useProgram();
+        gl::ActiveTexture(gl::TEXTURE0);
+        load_texture(&tex1);
+        gl::ActiveTexture(gl::TEXTURE1);
+        load_texture(&tex2);
+        blend_program.program.setFloat(to_string("blendFactor"), 0.5);
+        gl::DrawArrays(gl::TRIANGLES, 0, 6);
+        gl::ReadPixels(0, 0, target.width, target.height, gl::RGB, gl::UNSIGNED_BYTE, target.buffer as *mut GLvoid);
     }
 }
 
