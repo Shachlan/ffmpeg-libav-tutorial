@@ -16,12 +16,12 @@ extern "C" {
 
 void logging(const char *fmt, ...)
 {
-    // va_list args;
-    // fprintf(stderr, "LOG: ");
-    // va_start(args, fmt);
-    // vfprintf(stderr, fmt, args);
-    // va_end(args);
-    // fprintf(stderr, "\n");
+    va_list args;
+    fprintf(stderr, "LOG: ");
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+    fprintf(stderr, "\n");
 }
 
 int prepare_decoder(TranscodeContext *decoder_context)
@@ -157,7 +157,38 @@ static int prepare_audio_copy(TranscodeContext *encoder_context, TranscodeContex
 {
     int index = decoder_context->audio_stream_index;
     encoder_context->stream[index] = avformat_new_stream(encoder_context->format_context, NULL);
+    encoder_context->codec[index] = avcodec_find_encoder(decoder_context->codec[index]->id);
     avcodec_parameters_copy(encoder_context->stream[index]->codecpar, decoder_context->stream[index]->codecpar);
+    if (!encoder_context->codec[index])
+    {
+        logging("could not find the proper codec");
+        return -1;
+    }
+
+    encoder_context->codec_context[index] = avcodec_alloc_context3(encoder_context->codec[index]);
+    if (!encoder_context->codec_context[index])
+    {
+        logging("could not allocated memory for codec context");
+        return -1;
+    }
+
+    if (avcodec_parameters_to_context(encoder_context->codec_context[index], encoder_context->stream[index]->codecpar) < 0)
+    {
+        logging("could not copy encoder parameters to context");
+        return -1;
+    }
+
+    if (avcodec_parameters_from_context(encoder_context->stream[index]->codecpar, encoder_context->codec_context[index]) < 0)
+    {
+        logging("could not copy encoder parameters to output stream");
+        return -1;
+    }
+
+    if (avcodec_open2(encoder_context->codec_context[index], encoder_context->codec[index], NULL) < 0)
+    {
+        logging("could not open the codec");
+        return -1;
+    }
 
     return 0;
 }

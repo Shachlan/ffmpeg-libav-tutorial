@@ -14,8 +14,11 @@ extern "C" {
 
 #define FRONTEND 0;
 
-static int encode_frame(TranscodeContext *decoder_context, TranscodeContext *encoder_context, AVFormatContext *format_context, AVCodecContext *codec_context, AVFrame *frame, int stream_index)
+static int encode_frame(TranscodeContext *decoder_context,
+                        TranscodeContext *encoder_context, AVFrame *frame,
+                        int stream_index)
 {
+  AVCodecContext *codec_context = encoder_context->codec_context[stream_index];
   AVPacket *output_packet = av_packet_alloc();
   if (!output_packet)
   {
@@ -50,7 +53,7 @@ static int encode_frame(TranscodeContext *decoder_context, TranscodeContext *enc
                          encoder_context->stream[stream_index]->time_base);
 
     /* mux encoded frame */
-    ret = av_interleaved_write_frame(format_context, output_packet);
+    ret = av_interleaved_write_frame(encoder_context->format_context, output_packet);
 
     if (ret != 0)
     {
@@ -240,23 +243,6 @@ int main(int argc, char *argv[])
   {
     logging("AVPacket->pts %" PRId64, input_packet->pts);
 
-    if (input_packet->stream_index == decoder_context->audio_stream_index)
-    {
-      // just copying audio stream
-      av_packet_rescale_ts(input_packet,
-                           decoder_context->stream[input_packet->stream_index]->time_base,
-                           encoder_context->stream[input_packet->stream_index]->time_base);
-
-      if (av_interleaved_write_frame(encoder_context->format_context, input_packet) < 0)
-      {
-        logging("error while copying audio stream");
-        return -1;
-      }
-      logging("\tfinish copying packets without reencoding");
-      av_packet_unref(input_packet);
-      continue;
-    }
-
     int response = decode_single_packet(
         decoder_context, input_packet,
         inputFrame, input_packet->stream_index);
@@ -264,11 +250,25 @@ int main(int argc, char *argv[])
     {
       continue;
     }
-    else if (response < 0)
+    if (response < 0)
     {
       logging("DECODER: Error while receiving a frame from the decoder: %s", av_err2str(response));
       return response;
     }
+    if (input_packet->stream_index == decoder_context->audio_stream_index)
+    {
+      logging("audio frame");
+      response = encode_frame(decoder_context, encoder_context, inputFrame, input_packet->stream_index);
+      if (response < 0)
+      {
+        logging("DECODER: Error while receiving an audio frame from the decoder: %s", av_err2str(response));
+        return response;
+      }
+      av_frame_unref(inputFrame);
+      av_packet_unref(input_packet);
+      continue;
+    }
+    logging("video frame");
     AVRational current_pos = multiply_by_int(time_base, input_packet->pts);
     av_packet_unref(input_packet);
     double point_in_time = av_q2d(current_pos);
@@ -276,7 +276,7 @@ int main(int argc, char *argv[])
     if (point_in_time < wait || point_in_time > maxTime)
     {
       invert_single_frame(inputFrame, outputFrame, tex1, outputBuffer, lineSize, input_conversion_context, output_conversion_context);
-      encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[input_packet->stream_index], outputFrame, input_packet->stream_index);
+      encode_frame(decoder_context, encoder_context, outputFrame, input_packet->stream_index);
       av_frame_unref(inputFrame);
       continue;
     }
@@ -314,15 +314,16 @@ int main(int argc, char *argv[])
     blend_frames(inputFrame, secondary_input_frame, outputFrame, tex1, tex2,
                  outputBuffer, lineSize, secondary_buffer, secondary_lineSize,
                  input_conversion_context, output_conversion_context, secondary_input_conversion_context);
-    encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[input_packet->stream_index], outputFrame, input_packet->stream_index);
+    encode_frame(decoder_context, encoder_context, outputFrame, input_packet->stream_index);
     av_frame_unref(inputFrame);
     av_frame_unref(secondary_input_frame);
     //if (--how_many_packets_to_process <= 0) break;
   }
   // flush all frames
-  encode_frame(decoder_context, encoder_context, encoder_context->format_context,
-               encoder_context->codec_context[encoder_context->video_stream_index],
+  encode_frame(decoder_context, encoder_context,
                NULL, encoder_context->video_stream_index);
+  encode_frame(decoder_context, encoder_context,
+               NULL, encoder_context->audio_stream_index);
   // should I do it for the audio stream too?
 
   av_write_trailer(encoder_context->format_context);
