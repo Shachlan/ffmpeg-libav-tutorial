@@ -13,6 +13,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+char *vertex_shader_text = "attribute vec2 position;\n"
+                           "attribute vec2 texCoord;\n"
+                           "varying vec2 vTexCoord;\n"
+                           "void main(void) {\n"
+                           "    gl_Position = vec4(position, 0, 1);\n"
+                           "    vTexCoord = texCoord;\n"
+                           "}\n";
+
+char *invert_shader_text = "uniform sampler2D tex;\n"
+                           "varying vec2 vTexCoord;\n"
+                           "void main() {\n"
+                           "    const vec4 kInvert = vec4(1, 1, 1, 0);\n"
+                           "    gl_FragColor = kInvert - texture2D(tex, vTexCoord);\n"
+                           "}\n";
+
+char *blend_shader_text = "uniform sampler2D tex1;\n"
+                          "uniform sampler2D tex2;\n"
+                          "uniform float blendFactor;\n"
+                          "varying vec2 vTexCoord;\n"
+                          "\n"
+                          "void main() {\n"
+                          "    vec4 color1 = texture2D(tex1, vTexCoord);\n"
+                          "    vec4 color2 = texture2D(tex2, vTexCoord);\n"
+                          "    gl_FragColor = (color1 * blendFactor) + (color2 * (1.0 - blendFactor));\n"
+                          "}\n";
+
 typedef struct
 {
     GLuint program;
@@ -30,7 +56,7 @@ static const float position[12] = {
 static const float textureCoords[12] = {
     0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f};
 
-#ifdef FRONTEND == 1
+#if FRONTEND == 1
 
 #define PIXEL_FORMAT GL_RGBA
 
@@ -53,24 +79,6 @@ createTexture()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     return textureLoc;
-}
-
-static char *readFile(char *filename)
-{
-    FILE *file = fopen(filename, "r");
-    fseek(file, 0, SEEK_END);
-    long length = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    char *text = calloc(length + 1, sizeof(char));
-    if (fread(text, length, 1, file) != 1)
-    {
-        printf("Failed to read file: %s", filename);
-        free(text);
-        fclose(file);
-        return NULL;
-    }
-    fclose(file);
-    return text;
 }
 
 static GLuint build_shader(const GLchar *shader_source, GLenum type)
@@ -123,12 +131,10 @@ static GLuint texture_buffer_setup(GLuint program)
     return texturesBuffer;
 }
 
-static int build_program(char *vertex_shader_filename, char *fragment_shader_filename)
+static int build_program(char *vertex_shader, char *fragment_shader)
 {
     GLuint v_shader, f_shader;
 
-    char *vertex_shader = readFile(vertex_shader_filename);
-    char *fragment_shader = readFile(fragment_shader_filename);
     if (!((v_shader = build_shader(vertex_shader, GL_VERTEX_SHADER)) &&
           (f_shader = build_shader(fragment_shader, GL_FRAGMENT_SHADER))))
     {
@@ -152,7 +158,7 @@ static int build_program(char *vertex_shader_filename, char *fragment_shader_fil
 
 ProgramInfo build_invert_program()
 {
-    GLuint program = build_program("passthrough.vsh", "invert.fsh");
+    GLuint program = build_program(vertex_shader_text, invert_shader_text);
     glUseProgram(program);
     GLuint position_buffer = position_buffer_setup(program);
     GLuint texture_buffer = texture_buffer_setup(program);
@@ -164,7 +170,7 @@ ProgramInfo build_invert_program()
 
 ProgramInfo build_blend_program(float blend_ratio)
 {
-    GLuint program = build_program("passthrough.vsh", "blend.fsh");
+    GLuint program = build_program(vertex_shader_text, blend_shader_text);
     glUseProgram(program);
     glUniform1f(glGetUniformLocation(program, "blendFactor"), blend_ratio);
     GLuint position_buffer = position_buffer_setup(program);
@@ -177,7 +183,7 @@ ProgramInfo build_blend_program(float blend_ratio)
 
 void setupOpenGL(int width, int height, float blend_ratio, char *canvasName)
 {
-#ifdef FRONTEND == 1
+#if FRONTEND == 1
 
     EmscriptenWebGLContextAttributes attrs;
     attrs.explicitSwapControl = 0;
