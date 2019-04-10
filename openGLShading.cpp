@@ -28,23 +28,31 @@ static std::string vertex_shader_text = "attribute vec2 position;\n"
                                         "    vTexCoord = texCoord;\n"
                                         "}\n";
 
-static std::string invert_shader_text = "uniform sampler2D tex;\n"
-                                        "varying vec2 vTexCoord;\n"
-                                        "void main() {\n"
-                                        "    const vec4 kInvert = vec4(1, 1, 1, 0);\n"
-                                        "    gl_FragColor = kInvert - texture2D(tex, vTexCoord);\n"
-                                        "}\n";
+static std::string invert_shader_text =
+#if FRONTEND == 1
+    "precision mediump float;\n"
+#endif
+    "uniform sampler2D tex;\n"
+    "varying vec2 vTexCoord;\n"
+    "void main() {\n"
+    "    const vec4 kInvert = vec4(1, 1, 1, 0);\n"
+    "    gl_FragColor = kInvert - texture2D(tex, vTexCoord);\n"
+    "}\n";
 
-static std::string blend_shader_text = "uniform sampler2D tex1;\n"
-                                       "uniform sampler2D tex2;\n"
-                                       "uniform float blendFactor;\n"
-                                       "varying vec2 vTexCoord;\n"
-                                       "\n"
-                                       "void main() {\n"
-                                       "    vec4 color1 = texture2D(tex1, vTexCoord);\n"
-                                       "    vec4 color2 = texture2D(tex2, vTexCoord);\n"
-                                       "    gl_FragColor = (color1 * blendFactor) + (color2 * (1.0 - blendFactor));\n"
-                                       "}\n";
+static std::string blend_shader_text =
+#if FRONTEND == 1
+    "precision mediump float;\n"
+#endif
+    "uniform sampler2D tex1;\n"
+    "uniform sampler2D tex2;\n"
+    "uniform float blendFactor;\n"
+    "varying vec2 vTexCoord;\n"
+    "\n"
+    "void main() {\n"
+    "    vec4 color1 = texture2D(tex1, vTexCoord);\n"
+    "    vec4 color2 = texture2D(tex2, vTexCoord);\n"
+    "    gl_FragColor = (color1 * blendFactor) + (color2 * (1.0 - blendFactor));\n"
+    "}\n";
 
 typedef struct
 {
@@ -55,7 +63,9 @@ typedef struct
 
 ProgramInfo invert_program;
 ProgramInfo blend_program;
+#if FRONTEND == 0
 GLFWwindow *window;
+#endif
 
 static const float position[12] = {
     -1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f, 1.0f};
@@ -147,7 +157,6 @@ static int build_program(std::string *vertex_shader, std::string *fragment_shade
     glGetProgramiv(program, GL_LINK_STATUS, &status);
     if (status != GL_TRUE)
     {
-        //printf("Error making program");
         exit(1);
     }
     return program;
@@ -181,7 +190,6 @@ ProgramInfo build_blend_program(float blend_ratio)
 void setupOpenGL(int width, int height, float blend_ratio, char *canvasName)
 {
 #if FRONTEND == 1
-    printf("finding context");
     EmscriptenWebGLContextAttributes attrs;
     attrs.explicitSwapControl = 0;
     attrs.depth = 1;
@@ -191,7 +199,6 @@ void setupOpenGL(int width, int height, float blend_ratio, char *canvasName)
     attrs.minorVersion = 0;
 
     int context = emscripten_webgl_create_context(canvasName, &attrs);
-    printf("found context: %d", context);
     emscripten_webgl_make_context_current(context);
 
 #else
@@ -237,9 +244,10 @@ void getCurrentResults(int width, int height, uint8_t *outputBuffer)
 
 void tearDownOpenGL()
 {
-    //printf("teardown\n");
     glDeleteProgram(invert_program.program);
     glDeleteBuffers(1, &invert_program.position_buffer);
     glDeleteBuffers(1, &invert_program.texture_buffer);
+#if FRONTEND == 0
     glfwDestroyWindow(window);
+#endif
 }
