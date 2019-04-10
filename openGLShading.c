@@ -16,8 +16,6 @@
 typedef struct
 {
     GLuint program;
-    int texture_count;
-    GLuint textures[15];
     GLuint position_buffer;
     GLuint texture_buffer;
 } ProgramInfo;
@@ -33,6 +31,20 @@ static const float textureCoords[12] = {
     0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f};
 
 #define PIXEL_FORMAT GL_RGB
+
+uint32_t createTexture()
+{
+    GLuint textureLoc;
+    glGenTextures(1, &textureLoc);
+    glActiveTexture(GL_TEXTURE0 + textureLoc);
+
+    glBindTexture(GL_TEXTURE_2D, textureLoc);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    return textureLoc;
+}
 
 static char *readFile(char *filename)
 {
@@ -129,35 +141,14 @@ static int build_program(char *vertex_shader_filename, char *fragment_shader_fil
     return program;
 }
 
-static GLuint tex_setup(GLuint program, GLenum texture, GLchar *textureName, int textureNum)
-{
-    GLuint textureLoc;
-    glGenTextures(1, &textureLoc);
-    glActiveTexture(texture);
-
-    glBindTexture(GL_TEXTURE_2D, textureLoc);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-    glUniform1i(glGetUniformLocation(program, textureName), textureNum);
-    return textureLoc;
-}
-
 ProgramInfo build_invert_program()
 {
     GLuint program = build_program("passthrough.vsh", "invert.fsh");
     glUseProgram(program);
     GLuint position_buffer = position_buffer_setup(program);
     GLuint texture_buffer = texture_buffer_setup(program);
-    GLuint texture = tex_setup(program, GL_TEXTURE0, "tex", 0);
-    GLuint textures[15];
-    textures[0] = texture;
     return (ProgramInfo){
         program,
-        1,
-        {*textures},
         position_buffer,
         texture_buffer};
 }
@@ -169,18 +160,13 @@ ProgramInfo build_blend_program(float blend_ratio)
     glUniform1f(glGetUniformLocation(program, "blendFactor"), blend_ratio);
     GLuint position_buffer = position_buffer_setup(program);
     GLuint texture_buffer = texture_buffer_setup(program);
-    GLuint textures[15];
-    textures[0] = tex_setup(program, GL_TEXTURE0, "tex1", 0);
-    textures[1] = tex_setup(program, GL_TEXTURE1, "tex2", 1);
     return (ProgramInfo){
         program,
-        2,
-        {*textures},
         position_buffer,
         texture_buffer};
 }
 
-void setupOpenGL(int width, int height, float blend_ratio)
+void setupOpenGL(int width, int height, float blend_ratio, char *canvasName)
 {
     //printf("setup\n");
     glfwInit();
@@ -192,43 +178,37 @@ void setupOpenGL(int width, int height, float blend_ratio)
     blend_program = build_blend_program(blend_ratio);
 }
 
-void invertFrame(TextureInfo tex)
+void loadTexture(uint32_t textureID, int width, int height, uint8_t *buffer)
 {
-    glUseProgram(invert_program.program);
-    glActiveTexture(GL_TEXTURE0);
-    //printf("setup texture\n");
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex.width, tex.height, 0,
-                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, tex.buffer);
-    //printf("draw arrays\n");
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    //printf("read pixels\n");
-    glReadPixels(0, 0, tex.width, tex.height, PIXEL_FORMAT,
-                 GL_UNSIGNED_BYTE, tex.buffer);
+    glActiveTexture(GL_TEXTURE0 + textureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, PIXEL_FORMAT, width, height, 0,
+                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, buffer);
 }
 
-extern void blendFrames(TextureInfo target, TextureInfo tex1, TextureInfo tex2)
+void invertFrame(uint32_t textureID)
+{
+    glUseProgram(invert_program.program);
+    glUniform1i(glGetUniformLocation(invert_program.program, "tex"), textureID);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+void blendFrames(uint32_t texture1ID, uint32_t texture2ID)
 {
     glUseProgram(blend_program.program);
-    glActiveTexture(GL_TEXTURE0);
-    //printf("setup texture\n");
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex1.width, tex1.height, 0,
-                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, tex1.buffer);
-
-    glActiveTexture(GL_TEXTURE1);
-    //printf("setup texture\n");
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex2.width, tex2.height, 0,
-                 PIXEL_FORMAT, GL_UNSIGNED_BYTE, tex2.buffer);
-    //printf("draw arrays\n");
+    glUniform1i(glGetUniformLocation(blend_program.program, "tex1"), texture1ID);
+    glUniform1i(glGetUniformLocation(blend_program.program, "tex2"), texture2ID);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    //printf("read pixels\n");
-    glReadPixels(0, 0, target.width, target.height, PIXEL_FORMAT,
-                 GL_UNSIGNED_BYTE, target.buffer);
+}
+
+void getCurrentResults(int width, int height, uint8_t *outputBuffer)
+{
+    glReadPixels(0, 0, width, height, PIXEL_FORMAT,
+                 GL_UNSIGNED_BYTE, outputBuffer);
 }
 
 void tearDownOpenGL()
 {
     //printf("teardown\n");
-    glDeleteTextures(invert_program.texture_count, invert_program.textures);
     glDeleteProgram(invert_program.program);
     glDeleteBuffers(1, &invert_program.position_buffer);
     glDeleteBuffers(1, &invert_program.texture_buffer);

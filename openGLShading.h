@@ -1,16 +1,15 @@
 #include <stdint.h>
 
-typedef struct
-{
-    uint8_t *buffer;
-    int width;
-    int height;
-} TextureInfo;
+extern void setupOpenGL(int width, int height, float blend_ratio, char *canvasName);
 
-extern void setupOpenGL(int width, int height, float blend_ratio);
+extern uint32_t createTexture(void);
 
-extern void invertFrame(TextureInfo tex);
+extern void loadTexture(uint32_t textureID, int width, int height, uint8_t *buffer);
 
-extern void blendFrames(TextureInfo target, TextureInfo tex1, TextureInfo tex2);
+extern void invertFrame(uint32_t textureID);
+
+extern void blendFrames(uint32_t texture1ID, uint32_t texture2ID);
+
+extern void getCurrentResults(int width, int height, uint8_t *outputBuffer);
 
 extern void tearDownOpenGL(void);

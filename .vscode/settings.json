@@ -5,6 +5,7 @@
         "openglshading.h": "c",
         "stdlib.h": "c",
         "avformat.h": "c",
-        "imgutils.h": "c"
+        "imgutils.h": "c",
+        "ios": "c"
     }
 }

@@ -61,18 +61,24 @@ static int encode_frame(TranscodeContext *decoder_context, TranscodeContext *enc
   return 0;
 }
 
-static void invert_single_frame(AVFrame *inputFrame, AVFrame *outputFrame, uint8_t **outputBuffer, int *lineSize,
-                                struct SwsContext *input_conversion_context, struct SwsContext *output_conversion_context)
+static void invert_single_frame(AVFrame *inputFrame, AVFrame *outputFrame,
+                                uint32_t textureID,
+                                uint8_t **outputBuffer, int *lineSize,
+                                struct SwsContext *input_conversion_context,
+                                struct SwsContext *output_conversion_context)
 {
   outputFrame->pts = inputFrame->pts;
   sws_scale(input_conversion_context, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
   //printf("invert frame\n");
-  invertFrame((TextureInfo){outputBuffer[0], inputFrame->width, inputFrame->height});
+  loadTexture(textureID, inputFrame->width, inputFrame->height, outputBuffer[0]);
+  invertFrame(textureID);
+  getCurrentResults(inputFrame->width, inputFrame->height, outputBuffer[0]);
   //printf("rescale\n");
   sws_scale(output_conversion_context, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
 }
 
-static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame, AVFrame *outputFrame,
+static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame,
+                         AVFrame *outputFrame, uint32_t texture1ID, uint32_t texture2ID,
                          uint8_t **outputBuffer, int *lineSize, uint8_t **secondary_buffer, int *secondary_linesize,
                          struct SwsContext *input_conversion_context, struct SwsContext *output_conversion_context, struct SwsContext *secondary_conversion_context)
 {
@@ -80,9 +86,10 @@ static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame, AV
   sws_scale(input_conversion_context, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
   sws_scale(secondary_conversion_context, (const uint8_t *const *)secondary_input_frame->data, secondary_input_frame->linesize, 0, secondary_input_frame->height, secondary_buffer, secondary_linesize);
   //printf("invert frame\n");
-  blendFrames((TextureInfo){outputBuffer[0], inputFrame->width, inputFrame->height},
-              (TextureInfo){outputBuffer[0], inputFrame->width, inputFrame->height},
-              (TextureInfo){secondary_buffer[0], secondary_input_frame->width, secondary_input_frame->height});
+  loadTexture(texture1ID, inputFrame->width, inputFrame->height, outputBuffer[0]);
+  loadTexture(texture2ID, secondary_input_frame->width, secondary_input_frame->height, secondary_buffer[0]);
+  blendFrames(texture1ID, texture2ID);
+  getCurrentResults(inputFrame->width, inputFrame->height, outputBuffer[0]);
   //printf("rescale\n");
   sws_scale(output_conversion_context, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
 }
@@ -180,7 +187,9 @@ int main(int argc, char *argv[])
   AVCodecContext *secondary_video_context = secondary_decoder->codec_context[secondary_decoder->video_stream_index];
   int height = videoEncodingContext->height;
   int width = videoEncodingContext->width;
-  setupOpenGL(width, height, blendRatio);
+  setupOpenGL(width, height, blendRatio, NULL);
+  uint32_t tex1 = createTexture();
+  uint32_t tex2 = createTexture();
   struct SwsContext *input_conversion_context = conversion_context_from_codec_to_rgb(videoEncodingContext);
   struct SwsContext *secondary_input_conversion_context = conversion_context_from_codec_to_rgb(secondary_video_context);
   struct SwsContext *output_conversion_context = conversion_context_from_rgb_to_codec(videoEncodingContext);
@@ -263,7 +272,7 @@ int main(int argc, char *argv[])
 
     if (point_in_time < wait || point_in_time > maxTime)
     {
-      invert_single_frame(inputFrame, outputFrame, outputBuffer, lineSize, input_conversion_context, output_conversion_context);
+      invert_single_frame(inputFrame, outputFrame, tex1, outputBuffer, lineSize, input_conversion_context, output_conversion_context);
       encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[input_packet->stream_index], outputFrame, input_packet->stream_index);
       av_frame_unref(inputFrame);
       continue;
@@ -299,7 +308,7 @@ int main(int argc, char *argv[])
       }
     }
 
-    blend_frames(inputFrame, secondary_input_frame, outputFrame,
+    blend_frames(inputFrame, secondary_input_frame, outputFrame, tex1, tex2,
                  outputBuffer, lineSize, secondary_buffer, secondary_lineSize,
                  input_conversion_context, output_conversion_context, secondary_input_conversion_context);
     encode_frame(decoder_context, encoder_context, encoder_context->format_context, encoder_context->codec_context[input_packet->stream_index], outputFrame, input_packet->stream_index);
