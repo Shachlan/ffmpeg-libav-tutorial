@@ -35,8 +35,8 @@ static std::string invert_shader_text =
     "uniform sampler2D tex;\n"
     "varying vec2 vTexCoord;\n"
     "void main() {\n"
-    "    const vec4 kInvert = vec4(1, 1, 1, 0);\n"
-    "    gl_FragColor = kInvert - texture2D(tex, vTexCoord);\n"
+    "    const vec3 kInvert = vec3(1, 1, 1);\n"
+    "    gl_FragColor = vec4(kInvert - texture2D(tex, vTexCoord).rgb, 1);\n"
     "}\n";
 
 static std::string blend_shader_text =
