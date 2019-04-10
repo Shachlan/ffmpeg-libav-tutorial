@@ -3,10 +3,16 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <libswscale/swscale.h>
 #include <libavutil/avutil.h>
 #include <libavutil/pixdesc.h>
 #include <libavutil/opt.h>
+#ifdef __cplusplus
+}
+#endif
 
 void logging(const char *fmt, ...)
 {

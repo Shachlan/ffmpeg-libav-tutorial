@@ -1,17 +1,18 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+extern "C" {
 #include <libavutil/pixdesc.h>
 #include "libavutil/imgutils.h"
 #include <libswscale/swscale.h>
+#include "./preparation.h"
+#include "./rationalExtensions.h"
+}
 #include <string.h>
 #include <inttypes.h>
-
-#include "./preparation.h"
 #include "./openGLShading.h"
-#include "./rationalExtensions.h"
 
-#define FRONTEND = 0;
+#define FRONTEND 0;
 
 static int encode_frame(TranscodeContext *decoder_context, TranscodeContext *encoder_context, AVFormatContext *format_context, AVCodecContext *codec_context, AVFrame *frame, int stream_index)
 {
@@ -130,7 +131,7 @@ struct SwsContext *conversion_context_from_rgb_to_codec(AVCodecContext *context)
 
 int *linesize_for_size(int width)
 {
-  int *linesize = calloc(4, sizeof(int));
+  int *linesize = (int *)calloc(4, sizeof(int));
   linesize[0] = 3 * width * sizeof(uint8_t);
   return linesize;
 }
@@ -142,8 +143,8 @@ int *linesize_for_codec(AVCodecContext *context)
 
 uint8_t **rgb_buffer_for_size(int width, int height)
 {
-  uint8_t **buffer = calloc(1, sizeof(uint8_t *));
-  buffer[0] = calloc(3 * height * width, sizeof(uint8_t));
+  uint8_t **buffer = (uint8_t **)calloc(1, sizeof(uint8_t *));
+  buffer[0] = (uint8_t *)calloc(3 * height * width, sizeof(uint8_t));
   return buffer;
 }
 
@@ -154,7 +155,7 @@ uint8_t **rgb_buffer_for_codec(AVCodecContext *context)
 
 int main(int argc, char *argv[])
 {
-  TranscodeContext *decoder_context = calloc(1, sizeof(TranscodeContext));
+  TranscodeContext *decoder_context = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
   decoder_context->file_name = argv[1];
 
   if (prepare_decoder(decoder_context))
@@ -163,7 +164,7 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  TranscodeContext *secondary_decoder = calloc(1, sizeof(TranscodeContext));
+  TranscodeContext *secondary_decoder = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
   secondary_decoder->file_name = argv[2];
 
   if (prepare_decoder(secondary_decoder))
@@ -172,7 +173,7 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  TranscodeContext *encoder_context = calloc(1, sizeof(TranscodeContext));
+  TranscodeContext *encoder_context = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
   encoder_context->file_name = argv[3];
 
   if (prepare_encoder(encoder_context, decoder_context))

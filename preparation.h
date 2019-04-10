@@ -1,3 +1,6 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 
@@ -19,3 +22,7 @@ extern void logging(const char *fmt, ...);
 extern int prepare_decoder(TranscodeContext *decoder_context);
 
 extern int prepare_encoder(TranscodeContext *encoder_context, TranscodeContext *decoder_context);
+
+#ifdef __cplusplus
+}
+#endif
