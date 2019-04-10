@@ -30,9 +30,18 @@ static const float position[12] = {
 static const float textureCoords[12] = {
     0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f};
 
+#ifdef FRONTEND == 1
+
+#define PIXEL_FORMAT GL_RGBA
+
+#else
+
 #define PIXEL_FORMAT GL_RGB
 
-uint32_t createTexture()
+#endif
+
+uint32_t
+createTexture()
 {
     GLuint textureLoc;
     glGenTextures(1, &textureLoc);
@@ -168,11 +177,27 @@ ProgramInfo build_blend_program(float blend_ratio)
 
 void setupOpenGL(int width, int height, float blend_ratio, char *canvasName)
 {
-    //printf("setup\n");
+#ifdef FRONTEND == 1
+
+    EmscriptenWebGLContextAttributes attrs;
+    attrs.explicitSwapControl = 0;
+    attrs.depth = 1;
+    attrs.stencil = 1;
+    attrs.antialias = 1;
+    attrs.majorVersion = 1;
+    attrs.minorVersion = 0;
+
+    context = emscripten_webgl_create_context(id, &attrs);
+    emscripten_webgl_make_context_current(context);
+
+#else
+
     glfwInit();
     glfwWindowHint(GLFW_VISIBLE, 0);
     window = glfwCreateWindow(width, height, "", NULL, NULL);
     glfwMakeContextCurrent(window);
+
+#endif
     glViewport(0, 0, width, height);
     invert_program = build_invert_program();
     blend_program = build_blend_program(blend_ratio);

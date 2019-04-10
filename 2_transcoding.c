@@ -11,6 +11,8 @@
 #include "./openGLShading.h"
 #include "./rationalExtensions.h"
 
+#define FRONTEND = 0;
+
 static int encode_frame(TranscodeContext *decoder_context, TranscodeContext *encoder_context, AVFormatContext *format_context, AVCodecContext *codec_context, AVFrame *frame, int stream_index)
 {
   AVPacket *output_packet = av_packet_alloc();
