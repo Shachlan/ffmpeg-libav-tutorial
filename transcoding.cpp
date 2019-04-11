@@ -5,8 +5,8 @@ extern "C" {
 #include <libavutil/pixdesc.h>
 #include "libavutil/imgutils.h"
 #include <libswscale/swscale.h>
-#include "./ffmpeg_wrappers.h"
 #include "./rationalExtensions.h"
+#include "./video_conversion_utilities.h"
 }
 #include <string.h>
 #include <inttypes.h>
@@ -16,80 +16,34 @@ extern "C" {
 
 static void invert_single_frame(AVFrame *inputFrame, AVFrame *outputFrame,
                                 uint32_t textureID,
-                                uint8_t **outputBuffer, int *lineSize,
-                                struct SwsContext *input_conversion_context,
-                                struct SwsContext *output_conversion_context)
+                                ConversionContext *decoding_conversion,
+                                ConversionContext *encoding_conversion)
 {
   outputFrame->pts = inputFrame->pts;
-  sws_scale(input_conversion_context, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
+  convert_from_frame(inputFrame, decoding_conversion);
   //printf("invert frame\n");
-  loadTexture(textureID, inputFrame->width, inputFrame->height, outputBuffer[0]);
+  loadTexture(textureID, inputFrame->width, inputFrame->height, decoding_conversion->rgb_buffer[0]);
   invertFrame(textureID);
-  getCurrentResults(inputFrame->width, inputFrame->height, outputBuffer[0]);
-  //printf("rescale\n");
-  sws_scale(output_conversion_context, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
+  getCurrentResults(outputFrame->width, outputFrame->height, encoding_conversion->rgb_buffer[0]);
+  convert_to_frame(outputFrame, encoding_conversion);
 }
 
 static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame, AVFrame *outputFrame,
                          uint32_t texture1ID, uint32_t texture2ID,
-                         uint8_t **outputBuffer, int *lineSize,
-                         uint8_t **secondary_buffer, int *secondary_linesize,
-                         struct SwsContext *input_conversion_context,
-                         struct SwsContext *output_conversion_context,
-                         struct SwsContext *secondary_conversion_context)
+                         ConversionContext *decoding_conversion,
+                         ConversionContext *secondary_decoding_conversion,
+                         ConversionContext *encoding_conversion)
 {
   outputFrame->pts = inputFrame->pts;
-  sws_scale(input_conversion_context, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
-  sws_scale(secondary_conversion_context, (const uint8_t *const *)secondary_input_frame->data, secondary_input_frame->linesize, 0, secondary_input_frame->height, secondary_buffer, secondary_linesize);
+  convert_from_frame(inputFrame, decoding_conversion);
+  convert_from_frame(secondary_input_frame, secondary_decoding_conversion);
   //printf("invert frame\n");
-  loadTexture(texture1ID, inputFrame->width, inputFrame->height, outputBuffer[0]);
-  loadTexture(texture2ID, secondary_input_frame->width, secondary_input_frame->height, secondary_buffer[0]);
+  loadTexture(texture1ID, inputFrame->width, inputFrame->height, decoding_conversion->rgb_buffer[0]);
+  loadTexture(texture2ID, secondary_input_frame->width, secondary_input_frame->height, secondary_decoding_conversion->rgb_buffer[0]);
   blendFrames(texture1ID, texture2ID);
-  getCurrentResults(inputFrame->width, inputFrame->height, outputBuffer[0]);
+  getCurrentResults(outputFrame->width, outputFrame->height, encoding_conversion->rgb_buffer[0]);
   //printf("rescale\n");
-  sws_scale(output_conversion_context, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
-}
-
-struct SwsContext *conversion_context_from_codec_to_rgb(AVCodecContext *context)
-{
-  int height = context->height;
-  int width = context->width;
-  return sws_getContext(width, height, context->pix_fmt,
-                        width, height, AV_PIX_FMT_RGB24,
-                        SWS_BICUBIC, NULL, NULL, NULL);
-}
-
-struct SwsContext *conversion_context_from_rgb_to_codec(AVCodecContext *context)
-{
-  int height = context->height;
-  int width = context->width;
-  return sws_getContext(width, height, AV_PIX_FMT_RGB24,
-                        width, height, context->pix_fmt,
-                        SWS_BICUBIC, NULL, NULL, NULL);
-}
-
-int *linesize_for_size(int width)
-{
-  int *linesize = (int *)calloc(4, sizeof(int));
-  linesize[0] = 3 * width * sizeof(uint8_t);
-  return linesize;
-}
-
-int *linesize_for_codec(AVCodecContext *context)
-{
-  return linesize_for_size(context->width);
-}
-
-uint8_t **rgb_buffer_for_size(int width, int height)
-{
-  uint8_t **buffer = (uint8_t **)calloc(1, sizeof(uint8_t *));
-  buffer[0] = (uint8_t *)calloc(3 * height * width, sizeof(uint8_t));
-  return buffer;
-}
-
-uint8_t **rgb_buffer_for_codec(AVCodecContext *context)
-{
-  return rgb_buffer_for_size(context->width, context->height);
+  convert_to_frame(outputFrame, encoding_conversion);
 }
 
 int main(int argc, char *argv[])
@@ -129,9 +83,10 @@ int main(int argc, char *argv[])
   setupOpenGL(width, height, blendRatio, NULL);
   uint32_t tex1 = createTexture();
   uint32_t tex2 = createTexture();
-  struct SwsContext *input_conversion_context = conversion_context_from_codec_to_rgb(video_encoding_context);
-  struct SwsContext *secondary_input_conversion_context = conversion_context_from_codec_to_rgb(secondary_video_context);
-  struct SwsContext *output_conversion_context = conversion_context_from_rgb_to_codec(video_encoding_context);
+  ConversionContext *input_conversion_context = create_decoding_conversion_context(decoder->video->context);
+  ConversionContext *secondary_input_conversion_context = create_decoding_conversion_context(secondary_video_context);
+  ConversionContext *encoding_conversion = create_encoding_conversion_context(video_encoding_context);
+
   AVStream *secondary_video_stream = secondary_decoder->video->stream;
 
   //printf("initialize arrays\n");
@@ -144,13 +99,6 @@ int main(int argc, char *argv[])
   outputFrame->format = AV_PIX_FMT_YUV420P;
   av_image_alloc(outputFrame->data, outputFrame->linesize, width, height, AV_PIX_FMT_YUV420P, 1);
   outputFrame->pict_type = AV_PICTURE_TYPE_I;
-
-  printf("allocating arrays\n");
-  uint8_t **outputBuffer = rgb_buffer_for_codec(video_encoding_context);
-  uint8_t **secondary_buffer = rgb_buffer_for_codec(secondary_video_context);
-  int *lineSize = linesize_for_codec(video_encoding_context);
-  int *secondary_lineSize = linesize_for_codec(secondary_video_context);
-  printf("finished allocating arrays\n");
 
   if (!inputFrame)
   {
@@ -197,7 +145,8 @@ int main(int argc, char *argv[])
 
     if (point_in_time < wait || point_in_time > maxTime)
     {
-      invert_single_frame(inputFrame, outputFrame, tex1, outputBuffer, lineSize, input_conversion_context, output_conversion_context);
+      invert_single_frame(inputFrame, outputFrame, tex1,
+                          input_conversion_context, encoding_conversion);
       encode_frame(components, encoder->video, outputFrame, input_packet, encoder->format_context);
       av_frame_unref(inputFrame);
       continue;
@@ -218,8 +167,7 @@ int main(int argc, char *argv[])
     }
 
     blend_frames(inputFrame, secondary_input_frame, outputFrame, tex1, tex2,
-                 outputBuffer, lineSize, secondary_buffer, secondary_lineSize,
-                 input_conversion_context, output_conversion_context, secondary_input_conversion_context);
+                 input_conversion_context, secondary_input_conversion_context, encoding_conversion);
     encode_frame(components, encoder->video, outputFrame, input_packet, encoder->format_context);
     av_frame_unref(inputFrame);
     av_frame_unref(secondary_input_frame);
@@ -237,12 +185,13 @@ int main(int argc, char *argv[])
 
   logging("releasing all the resources");
 
-  avformat_close_input(&decoder->format_context);
-  avformat_free_context(decoder->format_context);
-
+  free_conversion_context(input_conversion_context);
+  free_conversion_context(secondary_input_conversion_context);
+  free_conversion_context(encoding_conversion);
   av_packet_free(&input_packet);
   av_frame_free(&inputFrame);
   av_frame_free(&outputFrame);
+  av_frame_free(&secondary_input_frame);
   free_context(decoder);
   free_context(encoder);
   free_context(secondary_decoder);
