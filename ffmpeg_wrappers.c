@@ -1,4 +1,4 @@
-#include "preparation.h"
+#include "ffmpeg_wrappers.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -10,6 +10,7 @@ extern "C" {
 #include <libavutil/avutil.h>
 #include <libavutil/pixdesc.h>
 #include <libavutil/opt.h>
+#include <stdbool.h>
 #ifdef __cplusplus
 }
 #endif
@@ -222,4 +223,140 @@ int prepare_encoder(TranscodeContext *encoder, TranscodeContext *decoder)
     }
 
     return 0;
+}
+
+static int decode_single_packet(
+    FrameCodingComponents *decoder,
+    AVPacket *packet, AVFrame *inputFrame)
+{
+    AVCodecContext *codec_context = decoder->context;
+    int response = avcodec_send_packet(codec_context, packet);
+
+    if (response < 0)
+    {
+        logging("DECODER: Error while sending a packet to the decoder: %s", av_err2str(response));
+        return response;
+    }
+
+    return avcodec_receive_frame(codec_context, inputFrame);
+}
+
+static int get_next_frame(TranscodeContext *decoder, AVPacket *packet, AVFrame *frame,
+                          bool ignore_audio, bool ignore_video, AVMediaType *resulting_media)
+{
+    bool video_packet;
+    int result = 0;
+    while (result >= 0)
+    {
+        result = av_read_frame(decoder->format_context, packet);
+        if (result == AVERROR_EOF)
+        {
+            break;
+        }
+        video_packet = packet->stream_index == decoder->video->stream->index;
+        if ((ignore_audio && !video_packet) || (ignore_video && video_packet))
+        {
+            av_packet_unref(packet);
+            continue;
+        }
+
+        FrameCodingComponents *components = video_packet ? decoder->video : decoder->audio;
+        result = decode_single_packet(
+            components, packet,
+            frame);
+        if (result == AVERROR(EAGAIN))
+        {
+            result = 0;
+            av_packet_unref(packet);
+            continue;
+        }
+        break;
+    }
+    *resulting_media = video_packet ? AVMEDIA_TYPE_VIDEO : AVMEDIA_TYPE_AUDIO;
+    return result;
+}
+
+int get_next_frame(TranscodeContext *decoder, AVPacket *packet, AVFrame *frame, AVMediaType *resulting_media)
+{
+
+    return get_next_frame(decoder, packet, frame, false, false, resulting_media);
+}
+
+int get_next_video_frame(TranscodeContext *decoder, AVPacket *packet, AVFrame *frame)
+{
+    AVMediaType media;
+    return get_next_frame(decoder, packet, frame,
+                          true, false, &media);
+}
+
+int encode_frame(FrameCodingComponents *decoder,
+                 FrameCodingComponents *encoder,
+                 AVFrame *frame,
+                 AVPacket *output_packet,
+                 AVFormatContext *format_context)
+{
+    AVCodecContext *codec_context = encoder->context;
+
+    int ret;
+    //if (frame)
+    // logging("Send frame %3" PRId64 "", frame->pts);
+    ret = avcodec_send_frame(codec_context, frame);
+
+    while (ret >= 0)
+    {
+        ret = avcodec_receive_packet(codec_context, output_packet);
+
+        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
+        {
+            break;
+        }
+        else if (ret < 0)
+        {
+            logging("ENCODING: Error while receiving a packet from the encoder: %s", av_err2str(ret));
+            return -1;
+        }
+
+        /* prepare packet for muxing */
+        output_packet->stream_index = encoder->stream->index;
+
+        av_packet_rescale_ts(output_packet,
+                             decoder->stream->time_base,
+                             encoder->stream->time_base);
+
+        /* mux encoded frame */
+        ret = av_interleaved_write_frame(format_context, output_packet);
+
+        if (ret != 0)
+        {
+            logging("Error %d while receiving a packet from the decoder: %s", ret, av_err2str(ret));
+        }
+
+        // logging("Write packet %d (size=%d)", output_packet->pts, output_packet->size);
+    }
+    av_packet_unref(output_packet);
+    return 0;
+}
+
+TranscodeContext *make_context(char *file_name)
+{
+    TranscodeContext *context = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
+    context->file_name = file_name;
+    return context;
+}
+
+static void free_components(FrameCodingComponents *components)
+{
+    avcodec_close(components->context);
+    avcodec_free_context(&components->context);
+    free(components);
+}
+
+void free_context(TranscodeContext *context)
+{
+    free_components(context->audio);
+    free_components(context->video);
+    avformat_close_input(&context->format_context);
+    avformat_free_context(context->format_context);
+
+    free(context);
 }

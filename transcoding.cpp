@@ -5,7 +5,7 @@ extern "C" {
 #include <libavutil/pixdesc.h>
 #include "libavutil/imgutils.h"
 #include <libswscale/swscale.h>
-#include "./preparation.h"
+#include "./ffmpeg_wrappers.h"
 #include "./rationalExtensions.h"
 }
 #include <string.h>
@@ -13,54 +13,6 @@ extern "C" {
 #include "./openGLShading.h"
 
 #define FRONTEND 0;
-
-static int encode_frame(FrameCodingComponents *decoder,
-                        FrameCodingComponents *encoder,
-                        AVFrame *frame,
-                        AVPacket *output_packet,
-                        AVFormatContext *format_context)
-{
-  AVCodecContext *codec_context = encoder->context;
-
-  int ret;
-  if (frame)
-    logging("Send frame %3" PRId64 "", frame->pts);
-  ret = avcodec_send_frame(codec_context, frame);
-
-  while (ret >= 0)
-  {
-    ret = avcodec_receive_packet(codec_context, output_packet);
-
-    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
-    {
-      break;
-    }
-    else if (ret < 0)
-    {
-      logging("ENCODING: Error while receiving a packet from the encoder: %s", av_err2str(ret));
-      return -1;
-    }
-
-    /* prepare packet for muxing */
-    output_packet->stream_index = encoder->stream->index;
-
-    av_packet_rescale_ts(output_packet,
-                         decoder->stream->time_base,
-                         encoder->stream->time_base);
-
-    /* mux encoded frame */
-    ret = av_interleaved_write_frame(format_context, output_packet);
-
-    if (ret != 0)
-    {
-      logging("Error %d while receiving a packet from the decoder: %s", ret, av_err2str(ret));
-    }
-
-    logging("Write packet %d (size=%d)", output_packet->pts, output_packet->size);
-  }
-  av_packet_unref(output_packet);
-  return 0;
-}
 
 static void invert_single_frame(AVFrame *inputFrame, AVFrame *outputFrame,
                                 uint32_t textureID,
@@ -96,22 +48,6 @@ static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame, AV
   getCurrentResults(inputFrame->width, inputFrame->height, outputBuffer[0]);
   //printf("rescale\n");
   sws_scale(output_conversion_context, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
-}
-
-static int decode_single_packet(
-    FrameCodingComponents *decoder,
-    AVPacket *packet, AVFrame *inputFrame)
-{
-  AVCodecContext *codec_context = decoder->context;
-  int response = avcodec_send_packet(codec_context, packet);
-
-  if (response < 0)
-  {
-    logging("DECODER: Error while sending a packet to the decoder: %s", av_err2str(response));
-    return response;
-  }
-
-  return avcodec_receive_frame(codec_context, inputFrame);
 }
 
 struct SwsContext *conversion_context_from_codec_to_rgb(AVCodecContext *context)
@@ -156,27 +92,9 @@ uint8_t **rgb_buffer_for_codec(AVCodecContext *context)
   return rgb_buffer_for_size(context->width, context->height);
 }
 
-void free_components(FrameCodingComponents *components)
-{
-  avcodec_close(components->context);
-  avcodec_free_context(&components->context);
-  free(components);
-}
-
-void free_context(TranscodeContext *context)
-{
-  free_components(context->audio);
-  free_components(context->video);
-  avformat_close_input(&context->format_context);
-  avformat_free_context(context->format_context);
-
-  free(context);
-}
-
 int main(int argc, char *argv[])
 {
-  TranscodeContext *decoder = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
-  decoder->file_name = argv[1];
+  TranscodeContext *decoder = make_context(argv[1]);
 
   if (prepare_decoder(decoder))
   {
@@ -184,8 +102,7 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  TranscodeContext *secondary_decoder = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
-  secondary_decoder->file_name = argv[2];
+  TranscodeContext *secondary_decoder = make_context(argv[2]);
 
   if (prepare_decoder(secondary_decoder))
   {
@@ -193,8 +110,7 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  TranscodeContext *encoder = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
-  encoder->file_name = argv[3];
+  TranscodeContext *encoder = make_context(argv[3]);
 
   if (prepare_encoder(encoder, decoder))
   {
@@ -255,28 +171,16 @@ int main(int argc, char *argv[])
   printf("duration: %lf, max time: %lf, wait: %d\n", duration_in_seconds, maxTime, wait);
   AVRational last_secondary_pts = av_make_q(INT16_MIN, 1);
   AVRational next_secondary_pts = av_make_q(0, 1);
+  int response;
 
-  while (av_read_frame(decoder->format_context, input_packet) >= 0)
+  AVMediaType media_type;
+  while (get_next_frame(decoder, input_packet, inputFrame, &media_type) >= 0)
   {
-    logging("AVPacket->pts %" PRId64, input_packet->pts);
-    bool video_packet = input_packet->stream_index == decoder->video->stream->index;
-    FrameCodingComponents *components = video_packet ? decoder->video : decoder->audio;
-
-    int response = decode_single_packet(
-        components, input_packet,
-        inputFrame);
-    if (response == AVERROR(EAGAIN) || response == AVERROR_EOF)
+    bool video_frame = media_type == AVMEDIA_TYPE_VIDEO;
+    FrameCodingComponents *components = video_frame ? decoder->video : decoder->audio;
+    if (!video_frame)
     {
-      continue;
-    }
-    if (response < 0)
-    {
-      logging("DECODER: Error while receiving a frame from the decoder: %s", av_err2str(response));
-      return response;
-    }
-    if (!video_packet)
-    {
-      logging("audio frame");
+      //logging("audio frame %lu", input_packet->pts);
       av_packet_unref(input_packet);
       response = encode_frame(components, encoder->audio, inputFrame, input_packet, encoder->format_context);
       if (response < 0)
@@ -286,7 +190,7 @@ int main(int argc, char *argv[])
       }
       continue;
     }
-    logging("video frame");
+    //logging("video frame %lu", input_packet->pts);
     AVRational current_pos = multiply_by_int(time_base, input_packet->pts);
     av_packet_unref(input_packet);
     double point_in_time = av_q2d(current_pos);
@@ -302,31 +206,15 @@ int main(int argc, char *argv[])
     AVRational adjustedPos = subtract_int(current_pos, wait);
     if (av_nearer_q(adjustedPos, last_secondary_pts, next_secondary_pts) == -1)
     {
-      while (av_read_frame(secondary_decoder->format_context, input_packet) >= 0)
+      if (get_next_video_frame(secondary_decoder, input_packet, secondary_input_frame) < 0)
       {
-        if (input_packet->stream_index != secondary_video_stream->index)
-        {
-          av_packet_unref(input_packet);
-          continue;
-        }
-        int response = decode_single_packet(
-            secondary_decoder->video, input_packet,
-            secondary_input_frame);
-        if (response == AVERROR(EAGAIN) || response == AVERROR_EOF)
-        {
-          continue;
-        }
-        if (response < 0)
-        {
-          logging("DECODER: Error while receiving a frame from the decoder: %s", av_err2str(response));
-          return response;
-        }
-
-        last_secondary_pts = multiply_by_int(secondary_time_base, input_packet->pts);
-        next_secondary_pts = multiply_by_int(secondary_time_base, input_packet->pts + input_packet->duration);
-        av_packet_unref(input_packet);
-        break;
+        logging("DECODER: Error while receiving a frame from the secondary decoder: %s", av_err2str(response));
+        return response;
       }
+
+      last_secondary_pts = multiply_by_int(secondary_time_base, input_packet->pts);
+      next_secondary_pts = multiply_by_int(secondary_time_base, input_packet->pts + input_packet->duration);
+      av_packet_unref(input_packet);
     }
 
     blend_frames(inputFrame, secondary_input_frame, outputFrame, tex1, tex2,

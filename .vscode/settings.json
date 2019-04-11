@@ -29,6 +29,14 @@
         "deque": "c",
         "future": "c",
         "iterator": "c",
-        "memory": "cpp"
+        "memory": "cpp",
+        "__mutex_base": "cpp",
+        "condition_variable": "cpp",
+        "avutil.h": "c",
+        "__functional_base": "c",
+        "array": "c",
+        "istream": "c",
+        "tuple": "c",
+        "utility": "c"
     }
 }
