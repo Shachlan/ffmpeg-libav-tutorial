@@ -14,17 +14,13 @@ extern "C" {
 
 #define FRONTEND 0;
 
-static int encode_frame(TranscodeContext *decoder_context,
-                        TranscodeContext *encoder_context, AVFrame *frame,
-                        int stream_index)
+static int encode_frame(FrameCodingComponents *decoder,
+                        FrameCodingComponents *encoder,
+                        AVFrame *frame,
+                        AVPacket *output_packet,
+                        AVFormatContext *format_context)
 {
-  AVCodecContext *codec_context = encoder_context->codec_context[stream_index];
-  AVPacket *output_packet = av_packet_alloc();
-  if (!output_packet)
-  {
-    logging("could not allocate memory for output packet");
-    return -1;
-  }
+  AVCodecContext *codec_context = encoder->context;
 
   int ret;
   if (frame)
@@ -46,14 +42,14 @@ static int encode_frame(TranscodeContext *decoder_context,
     }
 
     /* prepare packet for muxing */
-    output_packet->stream_index = stream_index;
+    output_packet->stream_index = encoder->stream->index;
 
     av_packet_rescale_ts(output_packet,
-                         decoder_context->stream[stream_index]->time_base,
-                         encoder_context->stream[stream_index]->time_base);
+                         decoder->stream->time_base,
+                         encoder->stream->time_base);
 
     /* mux encoded frame */
-    ret = av_interleaved_write_frame(encoder_context->format_context, output_packet);
+    ret = av_interleaved_write_frame(format_context, output_packet);
 
     if (ret != 0)
     {
@@ -63,7 +59,6 @@ static int encode_frame(TranscodeContext *decoder_context,
     logging("Write packet %d (size=%d)", output_packet->pts, output_packet->size);
   }
   av_packet_unref(output_packet);
-  av_packet_free(&output_packet);
   return 0;
 }
 
@@ -83,10 +78,13 @@ static void invert_single_frame(AVFrame *inputFrame, AVFrame *outputFrame,
   sws_scale(output_conversion_context, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
 }
 
-static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame,
-                         AVFrame *outputFrame, uint32_t texture1ID, uint32_t texture2ID,
-                         uint8_t **outputBuffer, int *lineSize, uint8_t **secondary_buffer, int *secondary_linesize,
-                         struct SwsContext *input_conversion_context, struct SwsContext *output_conversion_context, struct SwsContext *secondary_conversion_context)
+static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame, AVFrame *outputFrame,
+                         uint32_t texture1ID, uint32_t texture2ID,
+                         uint8_t **outputBuffer, int *lineSize,
+                         uint8_t **secondary_buffer, int *secondary_linesize,
+                         struct SwsContext *input_conversion_context,
+                         struct SwsContext *output_conversion_context,
+                         struct SwsContext *secondary_conversion_context)
 {
   outputFrame->pts = inputFrame->pts;
   sws_scale(input_conversion_context, (const uint8_t *const *)inputFrame->data, inputFrame->linesize, 0, inputFrame->height, outputBuffer, lineSize);
@@ -100,9 +98,11 @@ static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame,
   sws_scale(output_conversion_context, (const uint8_t *const *)outputBuffer, lineSize, 0, inputFrame->height, outputFrame->data, outputFrame->linesize);
 }
 
-static int decode_single_packet(TranscodeContext *decoder_context, AVPacket *packet, AVFrame *inputFrame, int stream_index)
+static int decode_single_packet(
+    FrameCodingComponents *decoder,
+    AVPacket *packet, AVFrame *inputFrame)
 {
-  AVCodecContext *codec_context = decoder_context->codec_context[stream_index];
+  AVCodecContext *codec_context = decoder->context;
   int response = avcodec_send_packet(codec_context, packet);
 
   if (response < 0)
@@ -156,12 +156,29 @@ uint8_t **rgb_buffer_for_codec(AVCodecContext *context)
   return rgb_buffer_for_size(context->width, context->height);
 }
 
+void free_components(FrameCodingComponents *components)
+{
+  avcodec_close(components->context);
+  avcodec_free_context(&components->context);
+  free(components);
+}
+
+void free_context(TranscodeContext *context)
+{
+  free_components(context->audio);
+  free_components(context->video);
+  avformat_close_input(&context->format_context);
+  avformat_free_context(context->format_context);
+
+  free(context);
+}
+
 int main(int argc, char *argv[])
 {
-  TranscodeContext *decoder_context = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
-  decoder_context->file_name = argv[1];
+  TranscodeContext *decoder = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
+  decoder->file_name = argv[1];
 
-  if (prepare_decoder(decoder_context))
+  if (prepare_decoder(decoder))
   {
     logging("error while preparing input");
     return -1;
@@ -176,10 +193,10 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  TranscodeContext *encoder_context = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
-  encoder_context->file_name = argv[3];
+  TranscodeContext *encoder = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
+  encoder->file_name = argv[3];
 
-  if (prepare_encoder(encoder_context, decoder_context))
+  if (prepare_encoder(encoder, decoder))
   {
     logging("error while preparing output");
     return -1;
@@ -189,17 +206,17 @@ int main(int argc, char *argv[])
   printf("blend ratio: %f\n", blendRatio);
   int wait = atoi(argv[5]);
 
-  AVCodecContext *videoEncodingContext = encoder_context->codec_context[encoder_context->video_stream_index];
-  AVCodecContext *secondary_video_context = secondary_decoder->codec_context[secondary_decoder->video_stream_index];
-  int height = videoEncodingContext->height;
-  int width = videoEncodingContext->width;
+  AVCodecContext *video_encoding_context = encoder->video->context;
+  AVCodecContext *secondary_video_context = secondary_decoder->video->context;
+  int height = video_encoding_context->height;
+  int width = video_encoding_context->width;
   setupOpenGL(width, height, blendRatio, NULL);
   uint32_t tex1 = createTexture();
   uint32_t tex2 = createTexture();
-  struct SwsContext *input_conversion_context = conversion_context_from_codec_to_rgb(videoEncodingContext);
+  struct SwsContext *input_conversion_context = conversion_context_from_codec_to_rgb(video_encoding_context);
   struct SwsContext *secondary_input_conversion_context = conversion_context_from_codec_to_rgb(secondary_video_context);
-  struct SwsContext *output_conversion_context = conversion_context_from_rgb_to_codec(videoEncodingContext);
-  AVStream *secondary_video_stream = secondary_decoder->stream[secondary_decoder->video_stream_index];
+  struct SwsContext *output_conversion_context = conversion_context_from_rgb_to_codec(video_encoding_context);
+  AVStream *secondary_video_stream = secondary_decoder->video->stream;
 
   //printf("initialize arrays\n");
   AVFrame *inputFrame = av_frame_alloc();
@@ -213,9 +230,9 @@ int main(int argc, char *argv[])
   outputFrame->pict_type = AV_PICTURE_TYPE_I;
 
   printf("allocating arrays\n");
-  uint8_t **outputBuffer = rgb_buffer_for_codec(videoEncodingContext);
+  uint8_t **outputBuffer = rgb_buffer_for_codec(video_encoding_context);
   uint8_t **secondary_buffer = rgb_buffer_for_codec(secondary_video_context);
-  int *lineSize = linesize_for_codec(videoEncodingContext);
+  int *lineSize = linesize_for_codec(video_encoding_context);
   int *secondary_lineSize = linesize_for_codec(secondary_video_context);
   printf("finished allocating arrays\n");
 
@@ -231,7 +248,7 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-  AVRational time_base = decoder_context->stream[decoder_context->video_stream_index]->time_base;
+  AVRational time_base = decoder->video->stream->time_base;
   AVRational secondary_time_base = secondary_video_stream->time_base;
   double duration_in_seconds = av_q2d(multiply_by_int(secondary_time_base, secondary_video_stream->duration));
   double maxTime = duration_in_seconds + wait;
@@ -239,13 +256,15 @@ int main(int argc, char *argv[])
   AVRational last_secondary_pts = av_make_q(INT16_MIN, 1);
   AVRational next_secondary_pts = av_make_q(0, 1);
 
-  while (av_read_frame(decoder_context->format_context, input_packet) >= 0)
+  while (av_read_frame(decoder->format_context, input_packet) >= 0)
   {
     logging("AVPacket->pts %" PRId64, input_packet->pts);
+    bool video_packet = input_packet->stream_index == decoder->video->stream->index;
+    FrameCodingComponents *components = video_packet ? decoder->video : decoder->audio;
 
     int response = decode_single_packet(
-        decoder_context, input_packet,
-        inputFrame, input_packet->stream_index);
+        components, input_packet,
+        inputFrame);
     if (response == AVERROR(EAGAIN) || response == AVERROR_EOF)
     {
       continue;
@@ -255,17 +274,16 @@ int main(int argc, char *argv[])
       logging("DECODER: Error while receiving a frame from the decoder: %s", av_err2str(response));
       return response;
     }
-    if (input_packet->stream_index == decoder_context->audio_stream_index)
+    if (!video_packet)
     {
       logging("audio frame");
-      response = encode_frame(decoder_context, encoder_context, inputFrame, input_packet->stream_index);
+      av_packet_unref(input_packet);
+      response = encode_frame(components, encoder->audio, inputFrame, input_packet, encoder->format_context);
       if (response < 0)
       {
         logging("DECODER: Error while receiving an audio frame from the decoder: %s", av_err2str(response));
         return response;
       }
-      av_frame_unref(inputFrame);
-      av_packet_unref(input_packet);
       continue;
     }
     logging("video frame");
@@ -276,7 +294,7 @@ int main(int argc, char *argv[])
     if (point_in_time < wait || point_in_time > maxTime)
     {
       invert_single_frame(inputFrame, outputFrame, tex1, outputBuffer, lineSize, input_conversion_context, output_conversion_context);
-      encode_frame(decoder_context, encoder_context, outputFrame, input_packet->stream_index);
+      encode_frame(components, encoder->video, outputFrame, input_packet, encoder->format_context);
       av_frame_unref(inputFrame);
       continue;
     }
@@ -292,8 +310,8 @@ int main(int argc, char *argv[])
           continue;
         }
         int response = decode_single_packet(
-            secondary_decoder, input_packet,
-            secondary_input_frame, input_packet->stream_index);
+            secondary_decoder->video, input_packet,
+            secondary_input_frame);
         if (response == AVERROR(EAGAIN) || response == AVERROR_EOF)
         {
           continue;
@@ -314,32 +332,32 @@ int main(int argc, char *argv[])
     blend_frames(inputFrame, secondary_input_frame, outputFrame, tex1, tex2,
                  outputBuffer, lineSize, secondary_buffer, secondary_lineSize,
                  input_conversion_context, output_conversion_context, secondary_input_conversion_context);
-    encode_frame(decoder_context, encoder_context, outputFrame, input_packet->stream_index);
+    encode_frame(components, encoder->video, outputFrame, input_packet, encoder->format_context);
     av_frame_unref(inputFrame);
     av_frame_unref(secondary_input_frame);
     //if (--how_many_packets_to_process <= 0) break;
   }
   // flush all frames
-  encode_frame(decoder_context, encoder_context,
-               NULL, encoder_context->video_stream_index);
-  encode_frame(decoder_context, encoder_context,
-               NULL, encoder_context->audio_stream_index);
+  encode_frame(decoder->audio, encoder->audio,
+               NULL, input_packet, encoder->format_context);
+
+  encode_frame(decoder->video, encoder->video,
+               NULL, input_packet, encoder->format_context);
   // should I do it for the audio stream too?
 
-  av_write_trailer(encoder_context->format_context);
+  av_write_trailer(encoder->format_context);
 
   logging("releasing all the resources");
 
-  avformat_close_input(&decoder_context->format_context);
-  avformat_free_context(decoder_context->format_context);
-  avformat_close_input(&secondary_decoder->format_context);
-  avformat_free_context(secondary_decoder->format_context);
+  avformat_close_input(&decoder->format_context);
+  avformat_free_context(decoder->format_context);
+
   av_packet_free(&input_packet);
   av_frame_free(&inputFrame);
   av_frame_free(&outputFrame);
-  avcodec_free_context(&decoder_context->codec_context[0]);
-  avcodec_free_context(&decoder_context->codec_context[1]);
-  free(decoder_context);
+  free_context(decoder);
+  free_context(encoder);
+  free_context(secondary_decoder);
   tearDownOpenGL();
   return 0;
 }

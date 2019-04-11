@@ -4,17 +4,20 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 
+typedef struct _FrameCodingComponents
+{
+    AVCodec *codec;
+    AVStream *stream;
+    AVCodecContext *context;
+} FrameCodingComponents;
+
 typedef struct _TranscodeContext
 {
     char *file_name;
     AVFormatContext *format_context;
 
-    AVCodec *codec[2];
-    AVStream *stream[2];
-    AVCodecParameters *codec_parameters[2];
-    AVCodecContext *codec_context[2];
-    int video_stream_index;
-    int audio_stream_index;
+    FrameCodingComponents *video;
+    FrameCodingComponents *audio;
 } TranscodeContext;
 
 extern void logging(const char *fmt, ...);

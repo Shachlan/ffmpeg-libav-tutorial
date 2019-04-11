@@ -24,6 +24,11 @@
         "algorithm": "cpp",
         "ratio": "cpp",
         "locale": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "__bit_reference": "c",
+        "deque": "c",
+        "future": "c",
+        "iterator": "c",
+        "memory": "cpp"
     }
 }
