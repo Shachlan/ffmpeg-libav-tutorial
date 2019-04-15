@@ -141,7 +141,7 @@ static int prepare_video_encoder(TranscodeContext *encoder, TranscodeContext *de
         return -1;
     }
 
-    encoder->video->context->time_base = av_inv_q(expected_framerate);
+    encoder->video->context->time_base = decoder->video->stream->time_base;
     encoder->video->context->framerate = expected_framerate;
     encoder->video->stream->time_base = encoder->video->context->time_base;
 
@@ -264,15 +264,16 @@ static int get_next_frame(TranscodeContext *decoder, AVPacket *packet, AVFrame *
     int result = 0;
     if (decoder->video->buffered_frame->pts >= decoder->video->next_pts)
     {
-        logging("decoder passed frames: %lu:%lu", decoder->video->next_pts, decoder->video->buffered_frame->pts);
+        //logging("%s passed frames: %lu:%lu", decoder->video->name, decoder->video->next_pts, decoder->video->buffered_frame->pts);
 
         av_frame_copy(frame, decoder->video->buffered_frame);
+        av_frame_copy_props(frame, decoder->video->buffered_frame);
         frame->pts = decoder->video->next_pts;
         decoder->video->next_pts += decoder->video->pts_increase_betweem_frames;
         *resulting_media = AVMEDIA_TYPE_VIDEO;
         return 0;
     }
-    logging("decoder get frames: %lu:%lu", decoder->video->next_pts, decoder->video->buffered_frame->pts);
+
     while (result >= 0)
     {
         result = av_read_frame(decoder->format_context, packet);
@@ -288,9 +289,8 @@ static int get_next_frame(TranscodeContext *decoder, AVPacket *packet, AVFrame *
         }
 
         FrameCodingComponents *components = video_packet ? decoder->video : decoder->audio;
-        result = decode_single_packet(
-            components, packet,
-            frame);
+        av_frame_unref(frame);
+        result = decode_single_packet(components, packet, frame);
         if (result == AVERROR(EAGAIN))
         {
             result = 0;
@@ -299,21 +299,21 @@ static int get_next_frame(TranscodeContext *decoder, AVPacket *packet, AVFrame *
         }
         if (!video_packet)
         {
-            logging("decoder got audio frame");
-            break;
+            *resulting_media = AVMEDIA_TYPE_AUDIO;
+            return result;
         }
+        //logging("%s get frames: %lu:%lu", decoder->video->name, decoder->video->next_pts, decoder->video->buffered_frame->pts);
 
+        av_frame_unref(decoder->video->buffered_frame);
         av_frame_copy(decoder->video->buffered_frame, frame);
-        decoder->video->buffered_frame->pts = packet->pts;
-        return get_next_frame(decoder, packet, frame, resulting_media);
+        av_frame_copy_props(decoder->video->buffered_frame, frame);
+        return get_next_frame(decoder, packet, frame, ignore_audio, ignore_video, resulting_media);
     }
-    *resulting_media = video_packet ? AVMEDIA_TYPE_VIDEO : AVMEDIA_TYPE_AUDIO;
     return result;
 }
 
 int get_next_frame(TranscodeContext *decoder, AVPacket *packet, AVFrame *frame, AVMediaType *resulting_media)
 {
-
     return get_next_frame(decoder, packet, frame, false, false, resulting_media);
 }
 
@@ -330,6 +330,10 @@ int encode_frame(FrameCodingComponents *decoder,
                  AVPacket *output_packet,
                  AVFormatContext *format_context)
 {
+    // if (encoder->codec->type == AVMEDIA_TYPE_VIDEO && frame != NULL)
+    // {
+    //     logging("encoding frame with pts: %lu", frame->pts);
+    // }
     AVCodecContext *codec_context = encoder->context;
 
     int ret;

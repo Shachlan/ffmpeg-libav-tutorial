@@ -12,6 +12,7 @@ typedef struct _FrameCodingComponents
     AVFrame *buffered_frame;
     long next_pts;
     long pts_increase_betweem_frames;
+    char *name;
 } FrameCodingComponents;
 
 typedef struct _TranscodeContext
