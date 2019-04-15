@@ -37,6 +37,7 @@
         "array": "c",
         "istream": "c",
         "tuple": "c",
-        "utility": "c"
+        "utility": "c",
+        "queue": "c"
     }
 }

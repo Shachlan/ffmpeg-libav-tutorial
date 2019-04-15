@@ -9,6 +9,8 @@ typedef struct _FrameCodingComponents
     AVCodec *codec;
     AVStream *stream;
     AVCodecContext *context;
+    AVFrame *buffered_frame;
+    AVRational expected_framerate;
 } FrameCodingComponents;
 
 typedef struct _TranscodeContext
@@ -22,11 +24,9 @@ typedef struct _TranscodeContext
 
 extern void logging(const char *fmt, ...);
 
-extern TranscodeContext *make_context(char *file_name);
+extern int prepare_decoder(char *file_name, TranscodeContext **decoder);
 
-extern int prepare_decoder(TranscodeContext *decoder);
-
-extern int prepare_encoder(TranscodeContext *encoder, TranscodeContext *decoder);
+extern int prepare_encoder(char *file_name, TranscodeContext *decoder, TranscodeContext **encoderRef);
 
 extern int get_next_video_frame(TranscodeContext *decoder, AVPacket *packet, AVFrame *frame);
 

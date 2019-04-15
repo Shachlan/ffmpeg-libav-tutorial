@@ -25,6 +25,13 @@ void logging(const char *fmt, ...)
     fprintf(stderr, "\n");
 }
 
+static TranscodeContext *make_context(char *file_name)
+{
+    TranscodeContext *context = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
+    context->file_name = file_name;
+    return context;
+}
+
 int prepare_components(FrameCodingComponents *prep)
 {
     prep->codec = avcodec_find_decoder(prep->stream->codecpar->codec_id);
@@ -44,8 +51,9 @@ int prepare_components(FrameCodingComponents *prep)
     return 0;
 }
 
-int prepare_decoder(TranscodeContext *decoder)
+int prepare_decoder(char *file_name, TranscodeContext **decoderRef)
 {
+    TranscodeContext *decoder = make_context(file_name);
     AVFormatContext *format_context = avformat_alloc_context();
     decoder->format_context = format_context;
     if (!format_context)
@@ -84,6 +92,7 @@ int prepare_decoder(TranscodeContext *decoder)
         return -1;
     }
 
+    *decoderRef = decoder;
     return 0;
 }
 
@@ -107,14 +116,8 @@ static int prepare_video_encoder(TranscodeContext *encoder, TranscodeContext *de
 
     // how to free this?
     AVDictionary *encoder_options = NULL;
-    av_opt_set(&encoder_options, "keyint", "60", 0);
-    av_opt_set(&encoder_options, "min-keyint", "60", 0);
-    av_opt_set(&encoder_options, "no-scenecut", "1", 0);
 
     AVCodecContext *encoder_codec_context = encoder->video->context;
-    av_opt_set(encoder_codec_context->priv_data, "keyint", "60", 0);
-    av_opt_set(encoder_codec_context->priv_data, "min-keyint", "60", 0);
-    av_opt_set(encoder_codec_context->priv_data, "no-scenecut", "1", 0);
 
     encoder_codec_context->height = decoder->video->context->height;
     encoder_codec_context->width = decoder->video->context->width;
@@ -125,13 +128,16 @@ static int prepare_video_encoder(TranscodeContext *encoder, TranscodeContext *de
     else
         encoder->video->context->pix_fmt = decoder->video->context->pix_fmt;
 
-    encoder->video->context->time_base = decoder->video->stream->time_base;
-
     if (avcodec_parameters_from_context(encoder->video->stream->codecpar, encoder->video->context) < 0)
     {
         logging("could not copy encoder parameters to output stream");
         return -1;
     }
+
+    encoder->video->context->time_base = av_make_q(1, 30);
+    encoder->video->context->framerate = av_make_q(30, 1);
+    encoder->video->stream->time_base = encoder->video->context->time_base;
+    encoder->video->context->ticks_per_frame = 1;
 
     if (avcodec_open2(encoder->video->context, encoder->video->codec, &encoder_options) < 0)
     {
@@ -139,7 +145,6 @@ static int prepare_video_encoder(TranscodeContext *encoder, TranscodeContext *de
         return -1;
     }
 
-    encoder->video->stream->time_base = encoder->video->context->time_base;
     return 0;
 }
 
@@ -173,17 +178,21 @@ static int prepare_audio_copy(TranscodeContext *encoder, TranscodeContext *decod
         return -1;
     }
 
+    encoder->audio->context->channel_layout = AV_CH_LAYOUT_STEREO;
+    encoder->audio->context->channels = av_get_channel_layout_nb_channels(encoder->audio->context->channel_layout);
+
     if (avcodec_open2(encoder->audio->context, encoder->audio->codec, NULL) < 0)
     {
-        logging("could not open the codec");
+        logging("could not open the audio codec");
         return -1;
     }
 
     return 0;
 }
 
-int prepare_encoder(TranscodeContext *encoder, TranscodeContext *decoder)
+int prepare_encoder(char *file_name, TranscodeContext *decoder, TranscodeContext **encoderRef)
 {
+    TranscodeContext *encoder = make_context(file_name);
     encoder->audio = (FrameCodingComponents *)calloc(1, sizeof(FrameCodingComponents));
     encoder->video = (FrameCodingComponents *)calloc(1, sizeof(FrameCodingComponents));
     avformat_alloc_output_context2(&encoder->format_context, NULL, NULL, encoder->file_name);
@@ -222,6 +231,7 @@ int prepare_encoder(TranscodeContext *encoder, TranscodeContext *decoder)
         return -1;
     }
 
+    *encoderRef = encoder;
     return 0;
 }
 
@@ -335,13 +345,6 @@ int encode_frame(FrameCodingComponents *decoder,
     }
     av_packet_unref(output_packet);
     return 0;
-}
-
-TranscodeContext *make_context(char *file_name)
-{
-    TranscodeContext *context = (TranscodeContext *)calloc(1, sizeof(TranscodeContext));
-    context->file_name = file_name;
-    return context;
 }
 
 static void free_components(FrameCodingComponents *components)

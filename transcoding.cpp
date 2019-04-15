@@ -48,25 +48,23 @@ static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame, AV
 
 int main(int argc, char *argv[])
 {
-  TranscodeContext *decoder = make_context(argv[1]);
+  TranscodeContext *decoder;
+  TranscodeContext *secondary_decoder;
+  TranscodeContext *encoder;
 
-  if (prepare_decoder(decoder))
+  if (prepare_decoder(argv[1], &decoder))
   {
     logging("error while preparing input");
     return -1;
   }
 
-  TranscodeContext *secondary_decoder = make_context(argv[2]);
-
-  if (prepare_decoder(secondary_decoder))
+  if (prepare_decoder(argv[2], &secondary_decoder))
   {
     logging("error while preparing secondary input");
     return -1;
   }
 
-  TranscodeContext *encoder = make_context(argv[3]);
-
-  if (prepare_encoder(encoder, decoder))
+  if (prepare_encoder(argv[3], decoder, &encoder))
   {
     logging("error while preparing output");
     return -1;
