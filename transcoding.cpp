@@ -76,6 +76,7 @@ int main(int argc, char *argv[])
   float blendRatio = strtof(argv[4], NULL);
   printf("blend ratio: %f\n", blendRatio);
   int wait = atoi(argv[5]);
+  int length = atoi(argv[6]);
 
   AVCodecContext *video_encoding_context = encoder->video->context;
   AVCodecContext *secondary_video_context = secondary_decoder->video->context;
@@ -116,11 +117,14 @@ int main(int argc, char *argv[])
   AVRational time_base = decoder->video->stream->time_base;
   AVRational secondary_time_base = secondary_video_stream->time_base;
   double duration_in_seconds = av_q2d(multiply_by_int(secondary_time_base, secondary_video_stream->duration));
-  double maxTime = duration_in_seconds + wait;
+  double maxTime = (length > duration_in_seconds ? duration_in_seconds : length) + wait;
   printf("duration: %lf, max time: %lf, wait: %d\n", duration_in_seconds, maxTime, wait);
   int response;
 
   long counted_frames = 0;
+  long blended_frames = 0;
+  long inverted_frames = 0;
+  long audio_frames = 0;
   AVMediaType media_type;
   while (get_next_frame(decoder, input_packet, inputFrame, &media_type) >= 0)
   {
@@ -136,6 +140,7 @@ int main(int argc, char *argv[])
         logging("DECODER: Error while receiving an audio frame from the decoder: %s", av_err2str(response));
         return response;
       }
+      audio_frames++;
       av_frame_unref(inputFrame);
       continue;
     }
@@ -147,6 +152,7 @@ int main(int argc, char *argv[])
     //logging("point in time %f", point_in_time);
     if (point_in_time < wait || point_in_time > maxTime)
     {
+      inverted_frames++;
       invert_single_frame(inputFrame, outputFrame, tex1,
                           input_conversion_context, encoding_conversion);
       encode_frame(components, encoder->video, outputFrame, input_packet, encoder->format_context);
@@ -160,8 +166,9 @@ int main(int argc, char *argv[])
       logging("DECODER: Error while receiving a frame from the secondary decoder: %d %s", response, av_err2str(response));
       return response;
     }
-    else if (response != AVERROR_EOF)
+    else if (response == AVERROR_EOF)
     {
+      inverted_frames++;
       invert_single_frame(inputFrame, outputFrame, tex1,
                           input_conversion_context, encoding_conversion);
       encode_frame(components, encoder->video, outputFrame, input_packet, encoder->format_context);
@@ -170,6 +177,7 @@ int main(int argc, char *argv[])
 
     av_packet_unref(input_packet);
 
+    blended_frames++;
     blend_frames(inputFrame, secondary_input_frame, outputFrame, tex1, tex2,
                  input_conversion_context, secondary_input_conversion_context, encoding_conversion);
     encode_frame(components, encoder->video, outputFrame, input_packet, encoder->format_context);
@@ -183,7 +191,7 @@ int main(int argc, char *argv[])
                NULL, input_packet, encoder->format_context);
   // should I do it for the audio stream too?
 
-  logging("wrote %lu frames", counted_frames);
+  logging("wrote %lu frames. %lu blended, %lu inverted, %lu audio", counted_frames, blended_frames, inverted_frames, audio_frames);
   av_write_trailer(encoder->format_context);
 
   logging("releasing all the resources");

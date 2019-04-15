@@ -40,6 +40,7 @@
         "utility": "c",
         "queue": "c",
         "random": "c",
-        "variant": "c"
+        "variant": "c",
+        "regex": "cpp"
     }
 }
