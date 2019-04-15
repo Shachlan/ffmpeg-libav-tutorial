@@ -6,7 +6,7 @@ hello_world: clean small_bunny_1080p_60fps.mp4
 
 transcoding: clean
 	g++ -g -Wall -o build/transcoding -lavformat -lavcodec -lswscale -lz -lglfw -lavutil -framework OpenGL transcoding.cpp openGLShading.cpp ffmpeg_wrappers.c rationalExtensions.c video-conversion-utilities.c \
-	  && ./build/transcoding small_bunny_1080p_60fps.mp4 dog.mp4 bunny_1s_gop.mp4 0.8 1 
+	  && ./build/transcoding dog.mp4 small_bunny_1080p_60fps.mp4 bunny_1s_gop.mp4 0.8 1 
 
 clean:
 	rm -f ./build/hello_world ./build/transcoding

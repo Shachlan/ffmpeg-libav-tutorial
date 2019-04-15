@@ -51,20 +51,21 @@ int main(int argc, char *argv[])
   TranscodeContext *decoder;
   TranscodeContext *secondary_decoder;
   TranscodeContext *encoder;
+  AVRational expected_framerate = av_make_q(30, 1);
 
-  if (prepare_decoder(argv[1], &decoder))
+  if (prepare_decoder(argv[1], expected_framerate, &decoder))
   {
     logging("error while preparing input");
     return -1;
   }
 
-  if (prepare_decoder(argv[2], &secondary_decoder))
+  if (prepare_decoder(argv[2], expected_framerate, &secondary_decoder))
   {
     logging("error while preparing secondary input");
     return -1;
   }
 
-  if (prepare_encoder(argv[3], decoder, &encoder))
+  if (prepare_encoder(argv[3], expected_framerate, decoder, &encoder))
   {
     logging("error while preparing output");
     return -1;

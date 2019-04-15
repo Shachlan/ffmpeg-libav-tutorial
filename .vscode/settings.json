@@ -38,6 +38,8 @@
         "istream": "c",
         "tuple": "c",
         "utility": "c",
-        "queue": "c"
+        "queue": "c",
+        "random": "c",
+        "variant": "c"
     }
 }
