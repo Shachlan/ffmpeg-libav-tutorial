@@ -55,10 +55,10 @@ static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame,
 int main(int argc, char *argv[]) {
   logging("start");
   VideoDecodingComponents *decoder;
+  DecodingComponents *audio_decoder;
   VideoDecodingComponents *secondary_decoder;
   int height = 1200;
   int width = 1920;
-  Encoder *encoder = new Encoder(argv[3], "libx264", width, height, 30);
   AVRational expected_framerate = av_make_q(30, 1);
 
   logging("video decoder");
@@ -72,6 +72,15 @@ int main(int argc, char *argv[]) {
     logging("error while preparing secondary input");
     return -1;
   }
+
+  logging("audio decoder");
+  if (prepare_audio_decoder(argv[1], &audio_decoder)) {
+    logging("error while preparing audio input");
+    return -1;
+  }
+
+  Encoder *encoder = new Encoder(argv[3], "libx264", width, height, 30, "aac",
+                                 audio_decoder->context->sample_rate, 96000);
 
   logging("next");
   float blendRatio = strtof(argv[4], NULL);
