@@ -12,6 +12,7 @@ public:
           double framerate);
   ~Encoder();
   int encode_video_frame(double source_time_base);
+  int encode_audio_frame(double source_time_base);
   int finish_encoding();
 
   // TODO - make private:

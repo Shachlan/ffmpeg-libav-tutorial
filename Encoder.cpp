@@ -66,47 +66,49 @@ static int prepare_video_encoder(TranscodingComponents *encoder,
   return 0;
 }
 
-// static int prepare_audio_copy(DecodingComponents *encoder,
-//                               DecodingComponents *decoder) {
-//   encoder->stream = avformat_new_stream(encoder->format_context, NULL);
-//   encoder->codec = avcodec_find_encoder(decoder->codec->id);
-//   encoder->frame = av_frame_alloc();
-//   encoder->packet = av_packet_alloc();
-//   avcodec_parameters_copy(encoder->stream->codecpar,
-//   decoder->stream->codecpar); if (!encoder->codec) {
-//     logging("could not find the proper codec");
-//     return -1;
-//   }
+static int prepare_audio_encoder(TranscodingComponents *encoder,
+                                 AVFormatContext *format_context,
+                                 string codec_name) {
+  encoder->stream = avformat_new_stream(format_context, NULL);
+  encoder->codec = avcodec_find_encoder_by_name(codec_name.c_str());
+  encoder->frame = av_frame_alloc();
+  encoder->packet = av_packet_alloc();
+  // avcodec_parameters_copy(encoder->stream->codecpar,
+  // decoder->stream->codecpar);
+  if (!encoder->codec) {
+    logging("could not find the proper codec");
+    return -1;
+  }
 
-//   encoder->context = avcodec_alloc_context3(encoder->codec);
-//   if (!encoder->context) {
-//     logging("could not allocated memory for codec context");
-//     return -1;
-//   }
+  encoder->context = avcodec_alloc_context3(encoder->codec);
+  if (!encoder->context) {
+    logging("could not allocated memory for codec context");
+    return -1;
+  }
 
-//   if (avcodec_parameters_to_context(encoder->context,
-//                                     encoder->stream->codecpar) < 0) {
-//     logging("could not copy encoder parameters to context");
-//     return -1;
-//   }
+  if (avcodec_parameters_to_context(encoder->context,
+                                    encoder->stream->codecpar) < 0) {
+    logging("could not copy encoder parameters to context");
+    return -1;
+  }
 
-//   if (avcodec_parameters_from_context(encoder->stream->codecpar,
-//                                       encoder->context) < 0) {
-//     logging("could not copy encoder parameters to output stream");
-//     return -1;
-//   }
+  if (avcodec_parameters_from_context(encoder->stream->codecpar,
+                                      encoder->context) < 0) {
+    logging("could not copy encoder parameters to output stream");
+    return -1;
+  }
 
-//   encoder->context->channel_layout = AV_CH_LAYOUT_STEREO;
-//   encoder->context->channels =
-//       av_get_channel_layout_nb_channels(encoder->context->channel_layout);
+  encoder->context->channel_layout = AV_CH_LAYOUT_STEREO;
+  encoder->context->channels =
+      av_get_channel_layout_nb_channels(encoder->context->channel_layout);
 
-//   if (avcodec_open2(encoder->context, encoder->codec, NULL) < 0) {
-//     logging("could not open the audio codec");
-//     return -1;
-//   }
+  if (avcodec_open2(encoder->context, encoder->codec, NULL) < 0) {
+    logging("could not open the audio codec");
+    return -1;
+  }
 
-//   return 0;
-// }
+  return 0;
+}
 
 Encoder::Encoder(string file_name, string video_codec_name, int width,
                  int height, double framerate) {
