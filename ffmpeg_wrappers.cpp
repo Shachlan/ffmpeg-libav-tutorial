@@ -268,7 +268,7 @@ int get_next_video_frame(VideoDecodingComponents *decoder) {
     decoder->frame->pts = decoder->next_pts;
     decoder->next_pts += decoder->pts_increase_betweem_frames;
 
-    logging("got frame");
+    // logging("got frame");
     return 0;
   }
 

@@ -19,9 +19,9 @@ static void invert_single_frame(AVFrame *inputFrame, AVFrame *outputFrame,
                                 ConversionContext *decoding_conversion,
                                 ConversionContext *encoding_conversion) {
   outputFrame->pts = inputFrame->pts;
-  printf("start convert frame\n");
+  // printf("start convert frame\n");
   convert_from_frame(inputFrame, decoding_conversion);
-  printf("invert frame\n");
+  // printf("invert frame\n");
   loadTexture(textureID, inputFrame->width, inputFrame->height,
               decoding_conversion->rgb_buffer[0]);
   invertFrame(textureID);
@@ -39,7 +39,7 @@ static void blend_frames(AVFrame *inputFrame, AVFrame *secondary_input_frame,
   outputFrame->pts = inputFrame->pts;
   convert_from_frame(inputFrame, decoding_conversion);
   convert_from_frame(secondary_input_frame, secondary_decoding_conversion);
-  printf("blend frames\n");
+  // printf("blend frames\n");
   loadTexture(texture1ID, inputFrame->width, inputFrame->height,
               decoding_conversion->rgb_buffer[0]);
   loadTexture(texture2ID, secondary_input_frame->width,
@@ -116,27 +116,12 @@ int main(int argc, char *argv[]) {
   long inverted_frames = 0;
   long audio_frames = 0;
   while (get_next_video_frame(decoder) >= 0) {
-    // bool video_frame = media_type == AVMEDIA_TYPE_VIDEO;
-    // if (!video_frame)
-    // {
-    //   //logging("audio frame %lu", input_packet->pts);
-    //   av_packet_unref(input_packet);
-    //   response = encode_frame(components, encoder->audio, inputFrame,
-    //   input_packet, encoder->format_context); if (response < 0)
-    //   {
-    //     logging("DECODER: Error while receiving an audio frame from the
-    //     decoder: %s", av_err2str(response)); return response;
-    //   }
-    //   audio_frames++;
-    //   av_frame_unref(inputFrame);
-    //   continue;
-    // }
     counted_frames++;
 
     double source_time_base = av_q2d(decoder->stream->time_base);
     AVRational current_pos = multiply_by_int(time_base, decoder->packet->pts);
     double point_in_time = av_q2d(current_pos);
-    logging("point in time %f", point_in_time);
+    // logging("point in time %f", point_in_time);
     if (point_in_time < wait || point_in_time > maxTime) {
       inverted_frames++;
       invert_single_frame(decoder->frame, encoder->video_encoder->frame, tex1,
@@ -166,11 +151,17 @@ int main(int argc, char *argv[]) {
                  input_conversion_context, secondary_input_conversion_context,
                  encoding_conversion);
     encoder->encode_video_frame(source_time_base);
-    // if (--how_many_packets_to_process <= 0) break;
   }
-  // // flush all frames
-  // encode_frame(decoder->audio, encoder->audio,
-  //              NULL, input_packet, encoder->format_context);
+
+  double audio_time_base = av_q2d(audio_decoder->stream->time_base);
+  while (get_next_audio_frame(audio_decoder) == 0) {
+    audio_frames++;
+    av_frame_copy(encoder->audio_encoder->frame, audio_decoder->frame);
+    av_frame_copy_props(encoder->audio_encoder->frame, audio_decoder->frame);
+    if (encoder->encode_audio_frame(audio_time_base) != 0) {
+      logging("audio encoding error");
+    }
+  }
 
   encoder->finish_encoding();
 

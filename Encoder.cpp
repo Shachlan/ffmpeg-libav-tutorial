@@ -188,8 +188,15 @@ int Encoder::encode_video_frame(double source_time_base) {
                       av_d2q(source_time_base, 300), video_encoder->frame);
 }
 
+int Encoder::encode_audio_frame(double source_time_base) {
+  return encode_frame(audio_encoder, format_context,
+                      av_d2q(source_time_base, 300), audio_encoder->frame);
+}
+
 int Encoder::finish_encoding() {
   encode_frame(video_encoder, format_context, video_encoder->stream->time_base,
+               NULL);
+  encode_frame(audio_encoder, format_context, audio_encoder->stream->time_base,
                NULL);
   av_write_trailer(format_context);
 }
