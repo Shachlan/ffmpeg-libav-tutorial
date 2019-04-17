@@ -1,10 +1,11 @@
-#ifdef __cplusplus
+#include "./ffmpeg_wrappers.hpp"
+
+
 extern "C" {
-#endif
-#include "./ffmpeg_wrappers.h"
 #include <libavutil/pixdesc.h>
 #include "libavutil/imgutils.h"
 #include <libswscale/swscale.h>
+}
 
 typedef struct _ConversionContext
 {
@@ -21,6 +22,3 @@ void free_conversion_context(ConversionContext *);
 
 int convert_from_frame(AVFrame *frame, ConversionContext *context);
 int convert_to_frame(AVFrame *frame, ConversionContext *context);
-#ifdef __cplusplus
-}
-#endif

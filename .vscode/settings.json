@@ -42,5 +42,6 @@
         "random": "c",
         "variant": "c",
         "regex": "cpp"
-    }
+    },
+    "git.ignoreLimitWarning": true
 }
