@@ -126,8 +126,6 @@ static int prepare_video_encoder(DecodingComponents *encoder,
 
   encoder_codec_context->height = decoder->context->height;
   encoder_codec_context->width = decoder->context->width;
-  encoder_codec_context->sample_aspect_ratio =
-      decoder->context->sample_aspect_ratio;
 
   if (encoder->codec->pix_fmts)
     encoder->context->pix_fmt = encoder->codec->pix_fmts[0];
@@ -321,53 +319,6 @@ int get_next_audio_frame(DecodingComponents *decoder) {
     break;
   }
   return result;
-}
-
-static int encode_frame(DecodingComponents *decoder,
-                        DecodingComponents *encoder, AVFrame *frame) {
-  AVCodecContext *codec_context = encoder->context;
-
-  int ret;
-  ret = avcodec_send_frame(codec_context, frame);
-
-  while (ret >= 0) {
-    ret = avcodec_receive_packet(codec_context, encoder->packet);
-
-    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-      break;
-    } else if (ret < 0) {
-      logging("ENCODING: Error while receiving a packet from the encoder: %s",
-              av_err2str(ret));
-      return -1;
-    }
-
-    /* prepare packet for muxing */
-    encoder->packet->stream_index = encoder->stream->index;
-
-    av_packet_rescale_ts(encoder->packet, decoder->stream->time_base,
-                         encoder->stream->time_base);
-
-    /* mux encoded frame */
-    ret = av_interleaved_write_frame(encoder->format_context, encoder->packet);
-
-    if (ret != 0) {
-      logging("Error %d while receiving a packet from the decoder: %s", ret,
-              av_err2str(ret));
-    }
-
-    // logging("Write packet %d (size=%d)", output_packet->pts,
-    // output_packet->size);
-  }
-  av_packet_unref(encoder->packet);
-  return 0;
-}
-
-int encode_frame(DecodingComponents *decoder, DecodingComponents *encoder) {
-  return encode_frame(decoder, encoder, encoder->frame);
-}
-
-int close_encoder(DecodingComponents *decoder, DecodingComponents *encoder) {
-  return encode_frame(decoder, encoder, NULL);
 }
 
 void free_context(DecodingComponents *context) {
