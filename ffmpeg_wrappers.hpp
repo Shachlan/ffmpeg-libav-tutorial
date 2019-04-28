@@ -16,27 +16,21 @@ struct TranscodingComponents {
 };
 
 struct DecodingComponents : TranscodingComponents {
+  static DecodingComponents *get_audio_decoder(string file_name);
+  int decode_next_audio_frame();
   ~DecodingComponents();
   string file_name;
   AVFormatContext *format_context;
 };
 
 struct VideoDecodingComponents : DecodingComponents {
+  static VideoDecodingComponents *
+  get_video_decoder(string file_name, AVRational expected_framerate);
   ~VideoDecodingComponents();
+  int decode_next_video_frame();
   AVFrame *buffered_frame;
   long next_pts;
   long pts_increase_betweem_frames;
 };
 
 void logging(const char *fmt, ...);
-
-int prepare_audio_decoder(string file_name, DecodingComponents **decoder);
-
-int prepare_video_decoder(string file_name, AVRational expected_framerate,
-                          VideoDecodingComponents **decoder);
-
-int get_next_video_frame(VideoDecodingComponents *decoder);
-
-int get_next_audio_frame(DecodingComponents *decoder);
-
-void free_context(DecodingComponents *context);

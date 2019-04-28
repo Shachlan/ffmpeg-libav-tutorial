@@ -62,19 +62,24 @@ int main(int argc, char *argv[]) {
   AVRational expected_framerate = av_make_q(30, 1);
 
   logging("video decoder");
-  if (prepare_video_decoder(argv[1], expected_framerate, &decoder)) {
+  decoder =
+      VideoDecodingComponents::get_video_decoder(argv[1], expected_framerate);
+  if (decoder == nullptr) {
     logging("error while preparing input");
     return -1;
   }
 
   logging("secondary decoder");
-  if (prepare_video_decoder(argv[2], expected_framerate, &secondary_decoder)) {
+  secondary_decoder =
+      VideoDecodingComponents::get_video_decoder(argv[2], expected_framerate);
+  if (secondary_decoder == nullptr) {
     logging("error while preparing secondary input");
     return -1;
   }
 
   logging("audio decoder");
-  if (prepare_audio_decoder(argv[1], &audio_decoder)) {
+  audio_decoder = DecodingComponents::get_audio_decoder(argv[1]);
+  if (audio_decoder == nullptr) {
     logging("error while preparing audio input");
     return -1;
   }
@@ -115,7 +120,7 @@ int main(int argc, char *argv[]) {
   long blended_frames = 0;
   long inverted_frames = 0;
   long audio_frames = 0;
-  while (get_next_video_frame(decoder) >= 0) {
+  while (decoder->decode_next_video_frame() >= 0) {
     counted_frames++;
 
     double source_time_base = av_q2d(decoder->stream->time_base);
@@ -131,7 +136,7 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    response = get_next_video_frame(secondary_decoder);
+    response = secondary_decoder->decode_next_video_frame();
     if (response < 0 && response != AVERROR_EOF) {
       logging("DECODER: Error while receiving a frame from the secondary "
               "decoder: %d %s",
@@ -154,7 +159,7 @@ int main(int argc, char *argv[]) {
   }
 
   double audio_time_base = av_q2d(audio_decoder->stream->time_base);
-  while (get_next_audio_frame(audio_decoder) == 0) {
+  while (audio_decoder->decode_next_audio_frame() == 0) {
     audio_frames++;
     av_frame_copy(encoder->audio_encoder->frame, audio_decoder->frame);
     av_frame_copy_props(encoder->audio_encoder->frame, audio_decoder->frame);
@@ -173,9 +178,14 @@ int main(int argc, char *argv[]) {
   free_conversion_context(input_conversion_context);
   free_conversion_context(secondary_input_conversion_context);
   free_conversion_context(encoding_conversion);
-  free_context(decoder);
-  encoder->finish_encoding();
-  free_context(secondary_decoder);
+  logging("releasing conversions");
+  delete (decoder);
+  delete (secondary_decoder);
+  delete (audio_decoder);
+  logging("releasing decoders");
+  // delete (encoder);
+  logging("releasing encoder");
   tearDownOpenGL();
+  logging("teardown opengl");
   return 0;
 }

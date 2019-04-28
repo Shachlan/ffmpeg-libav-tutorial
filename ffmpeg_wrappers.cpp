@@ -79,27 +79,32 @@ int prepare_decoding_components(DecodingComponents *decoder, string file_name,
   return 0;
 }
 
-int prepare_audio_decoder(string file_name, DecodingComponents **decoder_ref) {
+DecodingComponents *DecodingComponents::get_audio_decoder(string file_name) {
   DecodingComponents *decoder = new DecodingComponents();
-  *decoder_ref = decoder;
-  return prepare_decoding_components(decoder, file_name, AVMEDIA_TYPE_AUDIO);
+  if (prepare_decoding_components(decoder, file_name, AVMEDIA_TYPE_AUDIO) !=
+      0) {
+    delete (decoder);
+    return nullptr;
+  }
+  return decoder;
 }
 
-int prepare_video_decoder(string file_name, AVRational expected_framerate,
-                          VideoDecodingComponents **decoder_ref) {
+VideoDecodingComponents *
+VideoDecodingComponents::get_video_decoder(string file_name,
+                                           AVRational expected_framerate) {
   VideoDecodingComponents *decoder = new VideoDecodingComponents();
   if (prepare_decoding_components(decoder, file_name, AVMEDIA_TYPE_VIDEO) !=
       0) {
-    return -1;
+    delete (decoder);
+    return nullptr;
   }
-  *decoder_ref = decoder;
   decoder->buffered_frame = av_frame_alloc();
   decoder->buffered_frame->pts = INT64_MIN;
   decoder->pts_increase_betweem_frames = (long)av_q2d(
       av_inv_q(av_mul_q(decoder->stream->time_base, expected_framerate)));
   decoder->next_pts = 0;
   decoder->file_name = file_name;
-  return 0;
+  return decoder;
 }
 
 static int prepare_video_encoder(DecodingComponents *encoder,
@@ -257,75 +262,66 @@ static int decode_single_packet(DecodingComponents *decoder) {
   return avcodec_receive_frame(codec_context, decoder->frame);
 }
 
-int get_next_video_frame(VideoDecodingComponents *decoder) {
+int VideoDecodingComponents::decode_next_video_frame() {
   int result = 0;
-  if (decoder->buffered_frame->pts >= decoder->next_pts) {
+  if (this->buffered_frame->pts >= this->next_pts) {
     // logging("%s passed frames: %lu:%lu", decoder->name, decoder->next_pts,
     // decoder->buffered_frame->pts);
 
-    av_frame_copy(decoder->frame, decoder->buffered_frame);
-    av_frame_copy_props(decoder->frame, decoder->buffered_frame);
-    decoder->frame->pts = decoder->next_pts;
-    decoder->next_pts += decoder->pts_increase_betweem_frames;
+    av_frame_copy(this->frame, this->buffered_frame);
+    av_frame_copy_props(this->frame, this->buffered_frame);
+    this->frame->pts = this->next_pts;
+    this->next_pts += this->pts_increase_betweem_frames;
 
     // logging("got frame");
     return 0;
   }
 
   while (result >= 0) {
-    av_packet_unref(decoder->packet);
-    result = av_read_frame(decoder->format_context, decoder->packet);
+    av_packet_unref(this->packet);
+    result = av_read_frame(this->format_context, this->packet);
     if (result == AVERROR_EOF) {
       break;
     }
-    if (decoder->packet->stream_index != decoder->stream->index) {
+    if (this->packet->stream_index != this->stream->index) {
       continue;
     }
 
-    av_frame_unref(decoder->frame);
-    result = decode_single_packet(decoder);
+    av_frame_unref(this->frame);
+    result = decode_single_packet(this);
     if (result == AVERROR(EAGAIN)) {
       result = 0;
       continue;
     }
 
-    av_frame_unref(decoder->buffered_frame);
-    av_frame_copy(decoder->buffered_frame, decoder->frame);
-    av_frame_copy_props(decoder->buffered_frame, decoder->frame);
-    return get_next_video_frame(decoder);
+    av_frame_unref(this->buffered_frame);
+    av_frame_copy(this->buffered_frame, this->frame);
+    av_frame_copy_props(this->buffered_frame, this->frame);
+    return this->decode_next_video_frame();
   }
   return result;
 }
 
-int get_next_audio_frame(DecodingComponents *decoder) {
+int DecodingComponents::decode_next_audio_frame() {
   int result = 0;
   while (result >= 0) {
-    result = av_read_frame(decoder->format_context, decoder->packet);
+    result = av_read_frame(this->format_context, this->packet);
     if (result == AVERROR_EOF) {
       break;
     }
-    if (decoder->packet->stream_index != decoder->stream->index) {
-      av_packet_unref(decoder->packet);
+    if (this->packet->stream_index != this->stream->index) {
+      av_packet_unref(this->packet);
       continue;
     }
 
-    av_frame_unref(decoder->frame);
-    result = decode_single_packet(decoder);
+    av_frame_unref(this->frame);
+    result = decode_single_packet(this);
     if (result == AVERROR(EAGAIN)) {
       result = 0;
-      av_packet_unref(decoder->packet);
+      av_packet_unref(this->packet);
       continue;
     }
     break;
   }
   return result;
-}
-
-void free_context(DecodingComponents *context) {
-  avcodec_close(context->context);
-  avcodec_free_context(&context->context);
-  avformat_close_input(&context->format_context);
-  avformat_free_context(context->format_context);
-
-  free(context);
 }
