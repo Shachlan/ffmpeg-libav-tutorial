@@ -25,35 +25,35 @@ static void blend_frames(VideoDecoder *decoder, VideoDecoder *secondary_decoder,
 }
 
 int main(int argc, char *argv[]) {
-  logging("start");
+  log_debug("start");
   int height = 1200;
   int width = 1920;
   auto expected_framerate = 30;
 
   auto decoder = new VideoDecoder(argv[1], expected_framerate);
   if (decoder == nullptr) {
-    logging("error while preparing input");
+    log_error("error while preparing input");
     return -1;
   }
 
-  logging("secondary decoder");
+  log_info("secondary decoder");
   auto secondary_decoder = new VideoDecoder(argv[2], expected_framerate);
   if (secondary_decoder == nullptr) {
-    logging("error while preparing secondary input");
+    log_error("error while preparing secondary input");
     return -1;
   }
 
-  logging("audio decoder");
+  log_info("audio decoder");
   auto audio_decoder = new AudioDecoder(argv[1]);
   if (audio_decoder == nullptr) {
-    logging("error while preparing audio input");
+    log_error("error while preparing audio input");
     return -1;
   }
 
   Encoder *encoder = new Encoder(argv[3], "libx264", width, height, expected_framerate,
                                  audio_decoder->get_transcoding_components());
 
-  logging("next");
+  log_info("next");
   float blendRatio = strtof(argv[4], NULL);
   printf("blend ratio: %f\n", blendRatio);
   int wait = atoi(argv[5]);
@@ -88,10 +88,7 @@ int main(int argc, char *argv[]) {
 
     response = secondary_decoder->decode_next_frame();
     if (response < 0) {
-      logging(
-          "DECODER: Error while receiving a frame from the secondary "
-          "decoder: %d",
-          response);
+      log_error("DECODER: Error while receiving a frame from the secondary decoder: %d", response);
       return response;
     }
 
@@ -104,25 +101,24 @@ int main(int argc, char *argv[]) {
   while (audio_decoder->decode_next_frame() == 0) {
     audio_frames++;
     if (encoder->encode_audio_frame(audio_time_base, audio_decoder->get_current_timestamp()) != 0) {
-      logging("audio encoding error");
+      log_error("audio encoding error");
     }
   }
 
   encoder->finish_encoding();
 
-  logging("wrote %lu frames. %lu blended, %lu inverted, %lu audio", counted_frames, blended_frames,
-          inverted_frames, audio_frames);
+  log_info("wrote %lu frames. %lu blended, %lu inverted, %lu audio", counted_frames, blended_frames,
+           inverted_frames, audio_frames);
 
-  logging("releasing all the resources");
+  log_debug("releasing all the resources");
 
-  logging("releasing conversions");
   delete (decoder);
   delete (secondary_decoder);
   delete (audio_decoder);
-  logging("releasing decoders");
+  log_debug("releasing decoders");
   // delete (encoder);
-  logging("releasing encoder");
+  log_debug("releasing encoder");
   tearDownOpenGL();
-  logging("teardown opengl");
+  log_debug("teardown opengl");
   return 0;
 }

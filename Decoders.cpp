@@ -17,12 +17,12 @@ double Decoder::get_duration() {
   return av_q2d(av_mul_q(secondary_time_base, av_make_q(stream->duration, 1)));
 }
 
-AudioDecoder::AudioDecoder(string file_name) {
-  internal_decoder = DecodingComponents::get_audio_decoder(file_name);
+Decoder::~Decoder() {
+  delete (internal_decoder);
 }
 
-AudioDecoder::~AudioDecoder() {
-  delete (internal_decoder);
+AudioDecoder::AudioDecoder(string file_name) {
+  internal_decoder = DecodingComponents::get_audio_decoder(file_name);
 }
 
 TranscodingComponents *AudioDecoder::get_transcoding_components() {

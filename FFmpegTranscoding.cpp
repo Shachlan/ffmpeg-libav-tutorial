@@ -29,17 +29,17 @@ int prepare_decoding_components(DecodingComponents *decoder, string file_name, A
   AVFormatContext *format_context = avformat_alloc_context();
   decoder->format_context = format_context;
   if (!format_context) {
-    logging("ERROR could not allocate memory for Format Context");
+    log_error("ERROR could not allocate memory for Format Context");
     return -1;
   }
 
   if (avformat_open_input(&format_context, decoder->file_name.c_str(), NULL, NULL) != 0) {
-    logging("ERROR could not open the file");
+    log_error("ERROR could not open the file");
     return -1;
   }
 
   if (avformat_find_stream_info(format_context, NULL) < 0) {
-    logging("ERROR could not get the stream info");
+    log_error("ERROR could not get the stream info");
     return -1;
   }
 
@@ -50,12 +50,12 @@ int prepare_decoding_components(DecodingComponents *decoder, string file_name, A
   decoder->codec = avcodec_find_decoder(stream->codecpar->codec_id);
   decoder->context = avcodec_alloc_context3(decoder->codec);
   if (avcodec_parameters_to_context(decoder->context, stream->codecpar) < 0) {
-    logging("failed to copy codec params to codec context");
+    log_error("failed to copy codec params to codec context");
     return -1;
   }
 
   if (avcodec_open2(decoder->context, decoder->codec, NULL) < 0) {
-    logging("failed to open codec through avcodec_open2");
+    log_error("failed to open codec through avcodec_open2");
     return -1;
   }
   decoder->packet = av_packet_alloc();
@@ -94,7 +94,7 @@ static int decode_single_packet(DecodingComponents *decoder) {
   int response = avcodec_send_packet(codec_context, decoder->packet);
 
   if (response < 0) {
-    logging("DECODER: Error while sending a packet to the decoder: %s", av_err2str(response));
+    log_error("DECODER: Error while sending a packet to the decoder: %s", av_err2str(response));
     return response;
   }
 

@@ -4,6 +4,7 @@ struct TranscodingComponents;
 struct ConversionContext;
 
 struct Decoder {
+  virtual ~Decoder();
   virtual int decode_next_frame() = 0;
   long get_current_timestamp();
   double get_duration();
@@ -15,7 +16,6 @@ protected:
 
 struct AudioDecoder : Decoder {
   AudioDecoder(string file_name);
-  ~AudioDecoder();
   int decode_next_frame() override;
   TranscodingComponents *get_transcoding_components();
 };

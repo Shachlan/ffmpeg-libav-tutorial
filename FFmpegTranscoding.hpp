@@ -1,5 +1,4 @@
-#ifndef FFMPEG_TRANSCODING
-#define FFMPEG_TRANSCODING 1
+#pragma once
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -32,5 +31,3 @@ struct VideoDecodingComponents : DecodingComponents {
   long next_pts;
   long pts_increase_betweem_frames;
 };
-
-#endif
