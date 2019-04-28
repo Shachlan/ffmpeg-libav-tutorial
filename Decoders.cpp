@@ -1,6 +1,6 @@
 #include "Decoders.hpp"
 
-#include "ConversionContext.hpp"
+#include "WREVideoFormatConverter.hpp"
 #include "FFmpegTranscoding.hpp"
 
 long Decoder::get_current_timestamp() {
@@ -22,23 +22,23 @@ Decoder::~Decoder() {
 }
 
 AudioDecoder::AudioDecoder(string file_name) {
-  internal_decoder = DecodingComponents::get_audio_decoder(file_name);
+  internal_decoder = WREDecodingComponents::get_audio_decoder(file_name);
 }
 
-TranscodingComponents *AudioDecoder::get_transcoding_components() {
+WRETranscodingComponents *AudioDecoder::get_transcoding_components() {
   return internal_decoder;
 }
 
 int AudioDecoder::decode_next_frame() {
-  return internal_decoder->decode_next_audio_frame();
+  return internal_decoder->decode_next_frame();
 }
 
 VideoDecoder::VideoDecoder(string file_name, double expected_framerate) {
   video_decoder =
-      VideoDecodingComponents::get_video_decoder(file_name, av_d2q(expected_framerate, 300));
+      WREVideoDecodingComponents::get_video_decoder(file_name, av_d2q(expected_framerate, 300));
   internal_decoder = video_decoder;
   video_conversion_context =
-      ConversionContext::create_decoding_conversion_context(video_decoder->context);
+      WREVideoFormatConverter::create_decoding_conversion_context(video_decoder->context);
 }
 
 VideoDecoder::~VideoDecoder() {
@@ -59,7 +59,7 @@ uint8_t *VideoDecoder::get_rgb_buffer() {
 }
 
 int VideoDecoder::decode_next_frame() {
-  int result = video_decoder->decode_next_audio_frame();
+  int result = video_decoder->decode_next_frame();
   if (result == 0) {
     this->video_conversion_context->convert_from_frame(this->video_decoder->frame);
   }

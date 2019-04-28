@@ -9,10 +9,10 @@ extern "C" {
 #include "libavutil/imgutils.h"
 }
 
-#include "ConversionContext.hpp"
+#include "WREVideoFormatConverter.hpp"
 #include "FFmpegTranscoding.hpp"
 
-static int prepare_video_encoder(TranscodingComponents *encoder, AVFormatContext *format_context,
+static int prepare_video_encoder(WRETranscodingComponents *encoder, AVFormatContext *format_context,
                                  int width, int height, string codec_name,
                                  AVRational expected_framerate) {
   encoder->stream = avformat_new_stream(format_context, NULL);
@@ -62,8 +62,8 @@ static int prepare_video_encoder(TranscodingComponents *encoder, AVFormatContext
   return 0;
 }
 
-static int prepare_audio_encoder(TranscodingComponents *encoder, AVFormatContext *format_context,
-                                 TranscodingComponents *decoder) {
+static int prepare_audio_encoder(WRETranscodingComponents *encoder, AVFormatContext *format_context,
+                                 WRETranscodingComponents *decoder) {
   encoder->stream = avformat_new_stream(format_context, NULL);
   encoder->codec = avcodec_find_encoder(decoder->codec->id);
   encoder->frame = decoder->frame;
@@ -102,9 +102,9 @@ static int prepare_audio_encoder(TranscodingComponents *encoder, AVFormatContext
 }
 
 Encoder::Encoder(string file_name, string video_codec_name, int video_width, int video_height,
-                 double video_framerate, TranscodingComponents *audio_decoder) {
-  video_encoder = new TranscodingComponents();
-  audio_encoder = new TranscodingComponents();
+                 double video_framerate, WRETranscodingComponents *audio_decoder) {
+  video_encoder = new WRETranscodingComponents();
+  audio_encoder = new WRETranscodingComponents();
 
   avformat_alloc_output_context2(&format_context, NULL, NULL, file_name.c_str());
   if (!format_context) {
@@ -133,10 +133,10 @@ Encoder::Encoder(string file_name, string video_codec_name, int video_width, int
     throw "an error occurred when opening output file";
   }
   video_conversion_context =
-      ConversionContext::create_encoding_conversion_context(video_encoder->context);
+      WREVideoFormatConverter::create_encoding_conversion_context(video_encoder->context);
 }
 
-static int encode_frame(TranscodingComponents *encoder, AVFormatContext *format_context,
+static int encode_frame(WRETranscodingComponents *encoder, AVFormatContext *format_context,
                         AVRational source_time_base, AVFrame *frame) {
   AVCodecContext *codec_context = encoder->context;
 

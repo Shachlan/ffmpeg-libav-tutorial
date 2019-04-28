@@ -1,7 +1,7 @@
-struct DecodingComponents;
-struct VideoDecodingComponents;
-struct TranscodingComponents;
-struct ConversionContext;
+struct WREDecodingComponents;
+struct WREVideoDecodingComponents;
+struct WRETranscodingComponents;
+struct WREVideoFormatConverter;
 
 struct Decoder {
   virtual ~Decoder();
@@ -11,13 +11,13 @@ struct Decoder {
   double get_time_base();
 
 protected:
-  DecodingComponents *internal_decoder;
+  WREDecodingComponents *internal_decoder;
 };
 
 struct AudioDecoder : Decoder {
   AudioDecoder(string file_name);
   int decode_next_frame() override;
-  TranscodingComponents *get_transcoding_components();
+  WRETranscodingComponents *get_transcoding_components();
 };
 
 struct VideoDecoder : Decoder {
@@ -29,6 +29,6 @@ struct VideoDecoder : Decoder {
   int decode_next_frame() override;
 
 private:
-  VideoDecodingComponents *video_decoder;
-  ConversionContext *video_conversion_context;
+  WREVideoDecodingComponents *video_decoder;
+  WREVideoFormatConverter *video_conversion_context;
 };

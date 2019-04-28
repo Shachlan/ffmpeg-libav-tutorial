@@ -8,24 +8,24 @@ extern "C" {
 #include "libavutil/imgutils.h"
 }
 
-TranscodingComponents::~TranscodingComponents() {
+WRETranscodingComponents::~WRETranscodingComponents() {
   av_frame_free(&frame);
   av_packet_free(&packet);
   avcodec_close(context);
   avcodec_free_context(&context);
 }
 
-DecodingComponents::~DecodingComponents() {
+WREDecodingComponents::~WREDecodingComponents() {
   avformat_close_input(&format_context);
   avformat_free_context(format_context);
 }
 
-VideoDecodingComponents::~VideoDecodingComponents() {
+WREVideoDecodingComponents::~WREVideoDecodingComponents() {
   av_frame_free(&buffered_frame);
 }
 
-int prepare_decoding_components(DecodingComponents *decoder, string file_name, AVMediaType media) {
-  decoder->file_name = file_name;
+int prepare_decoding_components(WREDecodingComponents *decoder, string file_name,
+                                AVMediaType media) {
   AVFormatContext *format_context = avformat_alloc_context();
   decoder->format_context = format_context;
   if (!format_context) {
@@ -33,8 +33,8 @@ int prepare_decoding_components(DecodingComponents *decoder, string file_name, A
     return -1;
   }
 
-  if (avformat_open_input(&format_context, decoder->file_name.c_str(), NULL, NULL) != 0) {
-    log_error("ERROR could not open the file");
+  if (avformat_open_input(&format_context, file_name.c_str(), NULL, NULL) != 0) {
+    log_error("ERROR could not open %s", file_name.c_str());
     return -1;
   }
 
@@ -64,8 +64,8 @@ int prepare_decoding_components(DecodingComponents *decoder, string file_name, A
   return 0;
 }
 
-DecodingComponents *DecodingComponents::get_audio_decoder(string file_name) {
-  DecodingComponents *decoder = new DecodingComponents();
+WREDecodingComponents *WREDecodingComponents::get_audio_decoder(string file_name) {
+  WREDecodingComponents *decoder = new WREDecodingComponents();
   if (prepare_decoding_components(decoder, file_name, AVMEDIA_TYPE_AUDIO) != 0) {
     delete (decoder);
     return nullptr;
@@ -73,9 +73,9 @@ DecodingComponents *DecodingComponents::get_audio_decoder(string file_name) {
   return decoder;
 }
 
-VideoDecodingComponents *VideoDecodingComponents::get_video_decoder(string file_name,
-                                                                    AVRational expected_framerate) {
-  VideoDecodingComponents *decoder = new VideoDecodingComponents();
+WREVideoDecodingComponents *WREVideoDecodingComponents::get_video_decoder(
+    string file_name, AVRational expected_framerate) {
+  WREVideoDecodingComponents *decoder = new WREVideoDecodingComponents();
   if (prepare_decoding_components(decoder, file_name, AVMEDIA_TYPE_VIDEO) != 0) {
     delete (decoder);
     return nullptr;
@@ -85,11 +85,10 @@ VideoDecodingComponents *VideoDecodingComponents::get_video_decoder(string file_
   decoder->pts_increase_betweem_frames =
       (long)av_q2d(av_inv_q(av_mul_q(decoder->stream->time_base, expected_framerate)));
   decoder->next_pts = 0;
-  decoder->file_name = file_name;
   return decoder;
 }
 
-static int decode_single_packet(DecodingComponents *decoder) {
+static int decode_single_packet(WREDecodingComponents *decoder) {
   AVCodecContext *codec_context = decoder->context;
   int response = avcodec_send_packet(codec_context, decoder->packet);
 
@@ -101,7 +100,7 @@ static int decode_single_packet(DecodingComponents *decoder) {
   return avcodec_receive_frame(codec_context, decoder->frame);
 }
 
-int VideoDecodingComponents::decode_next_video_frame() {
+int WREVideoDecodingComponents::decode_next_frame() {
   int result = 0;
   if (this->buffered_frame->pts >= this->next_pts) {
     av_frame_copy(this->frame, this->buffered_frame);
@@ -131,12 +130,12 @@ int VideoDecodingComponents::decode_next_video_frame() {
     av_frame_unref(this->buffered_frame);
     av_frame_copy(this->buffered_frame, this->frame);
     av_frame_copy_props(this->buffered_frame, this->frame);
-    return this->decode_next_video_frame();
+    return this->decode_next_frame();
   }
   return result;
 }
 
-int DecodingComponents::decode_next_audio_frame() {
+int WREDecodingComponents::decode_next_frame() {
   int result = 0;
   while (result >= 0) {
     result = av_read_frame(this->format_context, this->packet);

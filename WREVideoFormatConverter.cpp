@@ -1,4 +1,4 @@
-#include "ConversionContext.hpp"
+#include "WREVideoFormatConverter.hpp"
 
 static struct SwsContext *conversion_context_from_codec_to_rgb(AVCodecContext *codec) {
   int height = codec->height;
@@ -34,39 +34,39 @@ uint8_t **rgb_buffer_for_codec(AVCodecContext *codec) {
   return rgb_buffer_for_size(codec->width, codec->height);
 }
 
-ConversionContext *ConversionContext::create_encoding_conversion_context(AVCodecContext *codec) {
-  auto context = new ConversionContext();
+WREVideoFormatConverter *WREVideoFormatConverter::create_encoding_conversion_context(AVCodecContext *codec) {
+  auto context = new WREVideoFormatConverter();
   context->conversion_context = conversion_context_from_rgb_to_codec(codec);
   context->linesize = linesize_for_codec(codec);
   context->rgb_buffer = rgb_buffer_for_codec(codec);
   return context;
 }
 
-ConversionContext *ConversionContext::create_decoding_conversion_context(AVCodecContext *codec) {
-  auto context = new ConversionContext();
+WREVideoFormatConverter *WREVideoFormatConverter::create_decoding_conversion_context(AVCodecContext *codec) {
+  auto context = new WREVideoFormatConverter();
   context->conversion_context = conversion_context_from_codec_to_rgb(codec);
   context->linesize = linesize_for_codec(codec);
   context->rgb_buffer = rgb_buffer_for_codec(codec);
   return context;
 }
 
-ConversionContext::~ConversionContext() {
+WREVideoFormatConverter::~WREVideoFormatConverter() {
   free(this->rgb_buffer[0]);
   free(this->rgb_buffer);
   free(this->linesize);
   sws_freeContext(this->conversion_context);
 }
 
-int ConversionContext::convert_from_frame(AVFrame *frame) {
+int WREVideoFormatConverter::convert_from_frame(AVFrame *frame) {
   return sws_scale(this->conversion_context, (const uint8_t *const *)frame->data, frame->linesize,
                    0, frame->height, this->rgb_buffer, this->linesize);
 }
 
-int ConversionContext::convert_to_frame(AVFrame *frame) {
+int WREVideoFormatConverter::convert_to_frame(AVFrame *frame) {
   return sws_scale(this->conversion_context, (const uint8_t *const *)this->rgb_buffer,
                    this->linesize, 0, frame->height, frame->data, frame->linesize);
 }
 
-uint8_t *ConversionContext::get_rgb_buffer() {
+uint8_t *WREVideoFormatConverter::get_rgb_buffer() {
   return this->rgb_buffer[0];
 }
