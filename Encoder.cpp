@@ -1,7 +1,5 @@
 #include "Encoder.hpp"
 
-#include "FFmpegTranscoding.hpp"
-
 extern "C" {
 #include <libavutil/avutil.h>
 #include <libavutil/opt.h>
@@ -12,6 +10,7 @@ extern "C" {
 }
 
 #include "ConversionContext.hpp"
+#include "FFmpegTranscoding.hpp"
 
 static int prepare_video_encoder(TranscodingComponents *encoder, AVFormatContext *format_context,
                                  int width, int height, string codec_name,

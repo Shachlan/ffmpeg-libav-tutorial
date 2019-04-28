@@ -1,19 +1,36 @@
 #include "FFmpegTranscoding.hpp"
 
-struct DecodingComponents : TranscodingComponents {
-  static DecodingComponents *get_audio_decoder(string file_name);
-  int decode_next_audio_frame();
-  ~DecodingComponents();
-  string file_name;
-  AVFormatContext *format_context;
+struct DecodingComponents;
+struct VideoDecodingComponents;
+struct TranscodingComponents;
+struct ConversionContext;
+
+struct Decoder {
+  virtual int decode_next_frame() = 0;
+  long get_current_timestamp();
+  double get_duration();
+  double get_time_base();
+
+protected:
+  DecodingComponents *internal_decoder;
 };
 
-struct VideoDecodingComponents : DecodingComponents {
-  static VideoDecodingComponents *get_video_decoder(string file_name,
-                                                    AVRational expected_framerate);
-  ~VideoDecodingComponents();
-  int decode_next_video_frame();
-  AVFrame *buffered_frame;
-  long next_pts;
-  long pts_increase_betweem_frames;
+struct AudioDecoder : Decoder {
+  AudioDecoder(string file_name);
+  ~AudioDecoder();
+  int decode_next_frame() override;
+  TranscodingComponents *get_transcoding_components();
+};
+
+struct VideoDecoder : Decoder {
+  VideoDecoder(string file_name, double expected_framerate);
+  ~VideoDecoder();
+  uint8_t *get_rgb_buffer();
+  int get_width();
+  int get_height();
+  int decode_next_frame() override;
+
+private:
+  VideoDecodingComponents *video_decoder;
+  ConversionContext *video_conversion_context;
 };

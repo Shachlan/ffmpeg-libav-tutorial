@@ -16,7 +16,7 @@ public:
   int get_width();
   int get_height();
 
-  // TODO - make private:
+private:
   TranscodingComponents *video_encoder;
   TranscodingComponents *audio_encoder;
   AVFormatContext *format_context;
