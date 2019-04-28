@@ -32,5 +32,3 @@ struct VideoDecodingComponents : DecodingComponents {
   long next_pts;
   long pts_increase_betweem_frames;
 };
-
-void logging(const char *fmt, ...);

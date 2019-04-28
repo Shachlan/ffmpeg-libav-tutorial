@@ -1,24 +1,11 @@
 #include "ffmpeg_wrappers.hpp"
 
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-
 extern "C" {
 #include "libavutil/imgutils.h"
 #include <libavutil/avutil.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
-}
-
-void logging(const char *fmt, ...) {
-  va_list args;
-  fprintf(stderr, "LOG: ");
-  va_start(args, fmt);
-  vfprintf(stderr, fmt, args);
-  va_end(args);
-  fprintf(stderr, "\n");
 }
 
 TranscodingComponents::~TranscodingComponents() {

@@ -199,4 +199,5 @@ int Encoder::finish_encoding() {
   encode_frame(audio_encoder, format_context, audio_encoder->stream->time_base,
                NULL);
   av_write_trailer(format_context);
+  return 0;
 }
