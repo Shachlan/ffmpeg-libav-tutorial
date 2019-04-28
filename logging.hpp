@@ -3,12 +3,32 @@
 #include <string>
 using std::string;
 
-/// Default logging call.
-void log(const string fmt, const string log_level, ...);
+/// This file presents flexible, non-intrusive logging macros that can be efficiently enabled or
+/// disabled via compile switches.
+//
+// There are four levels of logging: Info, Warning, Error and Debug, and each can be enabled
+// independently via the LOGGING_LEVEL_INFO, LOGGING_LEVEL_WARNING, LOGGING_LEVEL_ERROR and
+// LOGGING_LEVEL_DEBUG preprocessor variables, respectively.
+// Logging functions are implemented here via macros. Disabling logging, either entirely, or
+// at a specific level, completely removes the corresponding log invocations from the compiled
+// code, thus eliminating both the memory and CPU overhead that the logging calls would add.
+//
+// To perform logging, use any of the following function calls in your code:
+//
+// LogDebug(fmt, ...) - recommended for temporary use during debugging.
+//
+// LogInfo(fmt, ...) - recommended for general, infrequent, information messages.
+//
+// LogWarning(fmt, ...) - recommended for use only when there is an warning to be logged.
+//
+// LogError(fmt, ...) - recommended for use only when there is an error to be logged.
+//
+// In each case, the functions follow the general NSLog/printf template, where the first argument
+// "fmt" is a string that optionally includes embedded Format Specifiers, and subsequent optional
+// arguments indicate data to be formatted and inserted into the string. The number of optional
+// arguments must match the number of embedded Format Specifiers.
 
-/// Log levels are enabled by default. To disable, add LOGGING_LEVEL_<level>=1 to the
-/// GCC_PREPROCESSOR_DEFINITIONS build variable.
-/// For these settings to be effective, LOGGING must also be defined and non-zero.
+/// Log levels are enabled by default.
 #ifndef LOGGING_LEVEL_DEBUG
 #define LOGGING_LEVEL_DEBUG 1
 #endif
@@ -45,3 +65,7 @@ void log(const string fmt, const string log_level, ...);
 #else
 #define log_error(...)
 #endif
+
+/// Default logging call. This method shouldn't be called directly, but rather called through the
+/// macros given above.
+void log(const string fmt, const string log_level, ...);
