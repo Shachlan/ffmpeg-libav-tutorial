@@ -1,5 +1,3 @@
-#include "FFmpegTranscoding.hpp"
-
 struct DecodingComponents;
 struct VideoDecodingComponents;
 struct TranscodingComponents;

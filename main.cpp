@@ -1,14 +1,8 @@
+#include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-extern "C" {
-#include <libavutil/pixdesc.h>
-#include <libswscale/swscale.h>
-#include "./rationalExtensions.h"
-}
-#include <inttypes.h>
 #include <string.h>
-#include "./ConversionContext.hpp"
 #include "./openGLShading.h"
 #include "Decoders.hpp"
 #include "Encoder.hpp"
@@ -34,7 +28,7 @@ int main(int argc, char *argv[]) {
   logging("start");
   int height = 1200;
   int width = 1920;
-  auto expected_framerate = av_q2d(av_make_q(30, 1));
+  auto expected_framerate = 30;
 
   auto decoder = new VideoDecoder(argv[1], expected_framerate);
   if (decoder == nullptr) {
@@ -93,17 +87,12 @@ int main(int argc, char *argv[]) {
     }
 
     response = secondary_decoder->decode_next_frame();
-    if (response < 0 && response != AVERROR_EOF) {
+    if (response < 0) {
       logging(
           "DECODER: Error while receiving a frame from the secondary "
-          "decoder: %d %s",
-          response, av_err2str(response));
+          "decoder: %d",
+          response);
       return response;
-    } else if (response == AVERROR_EOF) {
-      inverted_frames++;
-      invert_single_frame(decoder, encoder, tex1);
-      encoder->encode_video_frame(source_time_base, decoder->get_current_timestamp());
-      continue;
     }
 
     blended_frames++;
