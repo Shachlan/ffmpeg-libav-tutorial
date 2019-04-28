@@ -1,3 +1,5 @@
+#ifndef FFMPEG_TRANSCODING
+#define FFMPEG_TRANSCODING 1
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -24,11 +26,13 @@ struct DecodingComponents : TranscodingComponents {
 };
 
 struct VideoDecodingComponents : DecodingComponents {
-  static VideoDecodingComponents *
-  get_video_decoder(string file_name, AVRational expected_framerate);
+  static VideoDecodingComponents *get_video_decoder(string file_name,
+                                                    AVRational expected_framerate);
   ~VideoDecodingComponents();
   int decode_next_video_frame();
   AVFrame *buffered_frame;
   long next_pts;
   long pts_increase_betweem_frames;
 };
+
+#endif
