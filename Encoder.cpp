@@ -65,12 +65,12 @@ static int prepare_video_encoder(TranscodingComponents *encoder,
 
 static int prepare_audio_encoder(TranscodingComponents *encoder,
                                  AVFormatContext *format_context,
-                                 string codec_name, int sample_rate,
-                                 long bit_rate) {
+                                 TranscodingComponents *decoder) {
   encoder->stream = avformat_new_stream(format_context, NULL);
-  encoder->frame = av_frame_alloc();
+  encoder->codec = avcodec_find_encoder(decoder->codec->id);
+  encoder->frame = decoder->frame;
   encoder->packet = av_packet_alloc();
-  encoder->codec = avcodec_find_encoder_by_name(codec_name.c_str());
+  avcodec_parameters_copy(encoder->stream->codecpar, decoder->stream->codecpar);
   if (!encoder->codec) {
     logging("could not find the proper codec");
     return -1;
@@ -82,19 +82,21 @@ static int prepare_audio_encoder(TranscodingComponents *encoder,
     return -1;
   }
 
-  encoder->stream->time_base = av_make_q(1, sample_rate);
-  encoder->context->channel_layout = AV_CH_LAYOUT_STEREO;
-  encoder->context->channels =
-      av_get_channel_layout_nb_channels(encoder->context->channel_layout);
-  encoder->context->sample_rate = sample_rate;
-  encoder->context->sample_fmt = encoder->codec->sample_fmts[0];
-  encoder->context->bit_rate = bit_rate;
+  if (avcodec_parameters_to_context(encoder->context,
+                                    encoder->stream->codecpar) < 0) {
+    logging("could not copy encoder parameters to context");
+    return -1;
+  }
 
   if (avcodec_parameters_from_context(encoder->stream->codecpar,
                                       encoder->context) < 0) {
     logging("could not copy encoder parameters to output stream");
     return -1;
   }
+
+  encoder->context->channel_layout = AV_CH_LAYOUT_STEREO;
+  encoder->context->channels =
+      av_get_channel_layout_nb_channels(encoder->context->channel_layout);
 
   if (avcodec_open2(encoder->context, encoder->codec, NULL) < 0) {
     logging("could not open the audio codec");
@@ -106,8 +108,7 @@ static int prepare_audio_encoder(TranscodingComponents *encoder,
 
 Encoder::Encoder(string file_name, string video_codec_name, int video_width,
                  int video_height, double video_framerate,
-                 string audio_codec_name, int audio_sample_rate,
-                 long audio_bit_rate) {
+                 TranscodingComponents *audio_decoder) {
   video_encoder = new TranscodingComponents();
   audio_encoder = new TranscodingComponents();
 
@@ -124,8 +125,7 @@ Encoder::Encoder(string file_name, string video_codec_name, int video_width,
   }
 
   logging("audio encoder");
-  if (prepare_audio_encoder(audio_encoder, format_context, audio_codec_name,
-                            audio_sample_rate, audio_bit_rate)) {
+  if (prepare_audio_encoder(audio_encoder, format_context, audio_decoder)) {
     throw "error while preparing audio copy";
   }
 
@@ -162,22 +162,15 @@ static int encode_frame(TranscodingComponents *encoder,
       return -1;
     }
 
-    /* prepare packet for muxing */
     encoder->packet->stream_index = encoder->stream->index;
-
     av_packet_rescale_ts(encoder->packet, source_time_base,
                          encoder->stream->time_base);
-
-    /* mux encoded frame */
     ret = av_interleaved_write_frame(format_context, encoder->packet);
 
     if (ret != 0) {
       logging("Error %d while receiving a packet from the decoder: %s", ret,
               av_err2str(ret));
     }
-
-    // logging("Write packet %d (size=%d)", output_packet->pts,
-    // output_packet->size);
   }
   av_packet_unref(encoder->packet);
   return 0;

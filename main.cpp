@@ -84,8 +84,8 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  Encoder *encoder = new Encoder(argv[3], "libx264", width, height, 30, "aac",
-                                 audio_decoder->context->sample_rate, 96000);
+  Encoder *encoder =
+      new Encoder(argv[3], "libx264", width, height, 30, audio_decoder);
 
   logging("next");
   float blendRatio = strtof(argv[4], NULL);
@@ -161,8 +161,6 @@ int main(int argc, char *argv[]) {
   double audio_time_base = av_q2d(audio_decoder->stream->time_base);
   while (audio_decoder->decode_next_audio_frame() == 0) {
     audio_frames++;
-    av_frame_copy(encoder->audio_encoder->frame, audio_decoder->frame);
-    av_frame_copy_props(encoder->audio_encoder->frame, audio_decoder->frame);
     if (encoder->encode_audio_frame(audio_time_base) != 0) {
       logging("audio encoding error");
     }
