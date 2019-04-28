@@ -4,19 +4,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include "./openGLShading.h"
-#include "Decoders.hpp"
-#include "Encoder.hpp"
+#include "WREDecoders.hpp"
+#include "WREEncoder.hpp"
 
 #define FRONTEND 0;
 
-static void invert_single_frame(VideoDecoder *decoder, Encoder *encoder, uint32_t textureID) {
+static void invert_single_frame(WREVideoDecoder *decoder, WREEncoder *encoder, uint32_t textureID) {
   loadTexture(textureID, decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
   invertFrame(textureID);
   getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
 }
 
-static void blend_frames(VideoDecoder *decoder, VideoDecoder *secondary_decoder, Encoder *encoder,
-                         uint32_t texture1ID, uint32_t texture2ID) {
+static void blend_frames(WREVideoDecoder *decoder, WREVideoDecoder *secondary_decoder,
+                         WREEncoder *encoder, uint32_t texture1ID, uint32_t texture2ID) {
   loadTexture(texture1ID, decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
   loadTexture(texture2ID, secondary_decoder->get_width(), secondary_decoder->get_height(),
               secondary_decoder->get_rgb_buffer());
@@ -30,28 +30,28 @@ int main(int argc, char *argv[]) {
   int width = 1920;
   auto expected_framerate = 30;
 
-  auto decoder = new VideoDecoder(argv[1], expected_framerate);
+  auto decoder = new WREVideoDecoder(argv[1], expected_framerate);
   if (decoder == nullptr) {
     log_error("error while preparing input");
     return -1;
   }
 
   log_info("secondary decoder");
-  auto secondary_decoder = new VideoDecoder(argv[2], expected_framerate);
+  auto secondary_decoder = new WREVideoDecoder(argv[2], expected_framerate);
   if (secondary_decoder == nullptr) {
     log_error("error while preparing secondary input");
     return -1;
   }
 
   log_info("audio decoder");
-  auto audio_decoder = new AudioDecoder(argv[1]);
+  auto audio_decoder = new WREAudioDecoder(argv[1]);
   if (audio_decoder == nullptr) {
     log_error("error while preparing audio input");
     return -1;
   }
 
-  Encoder *encoder = new Encoder(argv[3], "libx264", width, height, expected_framerate,
-                                 audio_decoder->get_transcoding_components());
+  WREEncoder *encoder = new WREEncoder(argv[3], "libx264", width, height, expected_framerate,
+                                       audio_decoder->get_transcoding_components());
 
   log_info("next");
   float blendRatio = strtof(argv[4], NULL);
@@ -113,7 +113,9 @@ int main(int argc, char *argv[]) {
   log_debug("releasing all the resources");
 
   delete (decoder);
+  log_debug("first decoder");
   delete (secondary_decoder);
+  log_debug("second decoder");
   delete (audio_decoder);
   log_debug("releasing decoders");
   // delete (encoder);

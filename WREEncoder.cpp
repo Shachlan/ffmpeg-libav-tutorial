@@ -1,4 +1,4 @@
-#include "Encoder.hpp"
+#include "WREEncoder.hpp"
 
 extern "C" {
 #include <libavutil/avutil.h>
@@ -9,8 +9,8 @@ extern "C" {
 #include "libavutil/imgutils.h"
 }
 
+#include "WREFFmpegTranscoding.hpp"
 #include "WREVideoFormatConverter.hpp"
-#include "FFmpegTranscoding.hpp"
 
 static int prepare_video_encoder(WRETranscodingComponents *encoder, AVFormatContext *format_context,
                                  int width, int height, string codec_name,
@@ -101,8 +101,8 @@ static int prepare_audio_encoder(WRETranscodingComponents *encoder, AVFormatCont
   return 0;
 }
 
-Encoder::Encoder(string file_name, string video_codec_name, int video_width, int video_height,
-                 double video_framerate, WRETranscodingComponents *audio_decoder) {
+WREEncoder::WREEncoder(string file_name, string video_codec_name, int video_width, int video_height,
+                       double video_framerate, WRETranscodingComponents *audio_decoder) {
   video_encoder = new WRETranscodingComponents();
   audio_encoder = new WRETranscodingComponents();
 
@@ -165,39 +165,39 @@ static int encode_frame(WRETranscodingComponents *encoder, AVFormatContext *form
   return 0;
 }
 
-int Encoder::encode_video_frame(double source_time_base, long source_timestamp) {
+int WREEncoder::encode_video_frame(double source_time_base, long source_timestamp) {
   this->video_encoder->frame->pts = source_timestamp;
   this->video_conversion_context->convert_to_frame(this->video_encoder->frame);
   return encode_frame(video_encoder, format_context, av_d2q(source_time_base, 300),
                       video_encoder->frame);
 }
 
-int Encoder::encode_audio_frame(double source_time_base, long source_timestamp) {
+int WREEncoder::encode_audio_frame(double source_time_base, long source_timestamp) {
   this->audio_encoder->frame->pts = source_timestamp;
   return encode_frame(audio_encoder, format_context, av_d2q(source_time_base, 300),
                       audio_encoder->frame);
 }
 
-int Encoder::finish_encoding() {
+int WREEncoder::finish_encoding() {
   encode_frame(video_encoder, format_context, video_encoder->stream->time_base, NULL);
   encode_frame(audio_encoder, format_context, audio_encoder->stream->time_base, NULL);
   av_write_trailer(format_context);
   return 0;
 }
 
-uint8_t *Encoder::get_rgb_buffer() {
+uint8_t *WREEncoder::get_rgb_buffer() {
   return this->video_conversion_context->get_rgb_buffer();
 }
 
-int Encoder::get_width() {
+int WREEncoder::get_width() {
   return this->video_encoder->context->width;
 }
 
-int Encoder::get_height() {
+int WREEncoder::get_height() {
   return this->video_encoder->context->height;
 }
 
-Encoder::~Encoder() {
+WREEncoder::~WREEncoder() {
   delete (video_encoder);
   delete (audio_encoder);
   delete (video_conversion_context);

@@ -1,39 +1,39 @@
-#include "Decoders.hpp"
+#include "WREDecoders.hpp"
 
+#include "WREFFmpegTranscoding.hpp"
 #include "WREVideoFormatConverter.hpp"
-#include "FFmpegTranscoding.hpp"
 
-long Decoder::get_current_timestamp() {
+long WREDecoder::get_current_timestamp() {
   return internal_decoder->frame->pts;
 }
 
-double Decoder::get_time_base() {
+double WREDecoder::get_time_base() {
   return av_q2d(internal_decoder->stream->time_base);
 }
 
-double Decoder::get_duration() {
+double WREDecoder::get_duration() {
   auto stream = internal_decoder->stream;
   AVRational secondary_time_base = stream->time_base;
   return av_q2d(av_mul_q(secondary_time_base, av_make_q(stream->duration, 1)));
 }
 
-Decoder::~Decoder() {
+WREDecoder::~WREDecoder() {
   delete (internal_decoder);
 }
 
-AudioDecoder::AudioDecoder(string file_name) {
+WREAudioDecoder::WREAudioDecoder(string file_name) {
   internal_decoder = WREDecodingComponents::get_audio_decoder(file_name);
 }
 
-WRETranscodingComponents *AudioDecoder::get_transcoding_components() {
+WRETranscodingComponents *WREAudioDecoder::get_transcoding_components() {
   return internal_decoder;
 }
 
-int AudioDecoder::decode_next_frame() {
+int WREAudioDecoder::decode_next_frame() {
   return internal_decoder->decode_next_frame();
 }
 
-VideoDecoder::VideoDecoder(string file_name, double expected_framerate) {
+WREVideoDecoder::WREVideoDecoder(string file_name, double expected_framerate) {
   video_decoder =
       WREVideoDecodingComponents::get_video_decoder(file_name, av_d2q(expected_framerate, 300));
   internal_decoder = video_decoder;
@@ -41,24 +41,23 @@ VideoDecoder::VideoDecoder(string file_name, double expected_framerate) {
       WREVideoFormatConverter::create_decoding_conversion_context(video_decoder->context);
 }
 
-VideoDecoder::~VideoDecoder() {
-  delete (video_decoder);
+WREVideoDecoder::~WREVideoDecoder() {
   delete (video_conversion_context);
 }
 
-int VideoDecoder::get_width() {
+int WREVideoDecoder::get_width() {
   return internal_decoder->context->width;
 }
 
-int VideoDecoder::get_height() {
+int WREVideoDecoder::get_height() {
   return internal_decoder->context->height;
 }
 
-uint8_t *VideoDecoder::get_rgb_buffer() {
+uint8_t *WREVideoDecoder::get_rgb_buffer() {
   return this->video_conversion_context->get_rgb_buffer();
 }
 
-int VideoDecoder::decode_next_frame() {
+int WREVideoDecoder::decode_next_frame() {
   int result = video_decoder->decode_next_frame();
   if (result == 0) {
     this->video_conversion_context->convert_from_frame(this->video_decoder->frame);

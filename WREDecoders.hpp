@@ -3,8 +3,8 @@ struct WREVideoDecodingComponents;
 struct WRETranscodingComponents;
 struct WREVideoFormatConverter;
 
-struct Decoder {
-  virtual ~Decoder();
+struct WREDecoder {
+  virtual ~WREDecoder();
   virtual int decode_next_frame() = 0;
   long get_current_timestamp();
   double get_duration();
@@ -14,15 +14,15 @@ protected:
   WREDecodingComponents *internal_decoder;
 };
 
-struct AudioDecoder : Decoder {
-  AudioDecoder(string file_name);
+struct WREAudioDecoder : WREDecoder {
+  WREAudioDecoder(string file_name);
   int decode_next_frame() override;
   WRETranscodingComponents *get_transcoding_components();
 };
 
-struct VideoDecoder : Decoder {
-  VideoDecoder(string file_name, double expected_framerate);
-  ~VideoDecoder();
+struct WREVideoDecoder : WREDecoder {
+  WREVideoDecoder(string file_name, double expected_framerate);
+  ~WREVideoDecoder();
   uint8_t *get_rgb_buffer();
   int get_width();
   int get_height();

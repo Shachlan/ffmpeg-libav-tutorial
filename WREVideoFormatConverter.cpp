@@ -34,7 +34,8 @@ uint8_t **rgb_buffer_for_codec(AVCodecContext *codec) {
   return rgb_buffer_for_size(codec->width, codec->height);
 }
 
-WREVideoFormatConverter *WREVideoFormatConverter::create_encoding_conversion_context(AVCodecContext *codec) {
+WREVideoFormatConverter *WREVideoFormatConverter::create_encoding_conversion_context(
+    AVCodecContext *codec) {
   auto context = new WREVideoFormatConverter();
   context->conversion_context = conversion_context_from_rgb_to_codec(codec);
   context->linesize = linesize_for_codec(codec);
@@ -42,7 +43,8 @@ WREVideoFormatConverter *WREVideoFormatConverter::create_encoding_conversion_con
   return context;
 }
 
-WREVideoFormatConverter *WREVideoFormatConverter::create_decoding_conversion_context(AVCodecContext *codec) {
+WREVideoFormatConverter *WREVideoFormatConverter::create_decoding_conversion_context(
+    AVCodecContext *codec) {
   auto context = new WREVideoFormatConverter();
   context->conversion_context = conversion_context_from_codec_to_rgb(codec);
   context->linesize = linesize_for_codec(codec);

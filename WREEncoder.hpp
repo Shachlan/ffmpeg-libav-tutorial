@@ -9,14 +9,14 @@ struct WREVideoFormatConverter;
 /// @important ATM audio encoding is strictly passthrough from a single source, so that the audio
 /// source components are passed during construction in order to copy all audio parameters and share
 /// all data buffers.
-class Encoder {
+class WREEncoder {
 public:
   /// Opens the file at \c file_name for audio-video encoding. The video will be encoded using \c
   /// video_codec_name codec, with resolution of \c video_width x \c video_height, with \c
   /// video_framerate. \c audio_decoder will be used to initialize the internal audio decoder.
-  Encoder(string file_name, string video_codec_name, int video_width, int video_height,
-          double video_framerate, WRETranscodingComponents *audio_decoder);
-  ~Encoder();
+  WREEncoder(string file_name, string video_codec_name, int video_width, int video_height,
+             double video_framerate, WRETranscodingComponents *audio_decoder);
+  ~WREEncoder();
 
   /// Returns a data buffer sized 3 * width * height, that will be encoded as an RGB frame.
   uint8_t *get_rgb_buffer();
