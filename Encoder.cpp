@@ -1,6 +1,6 @@
 #include "Encoder.hpp"
 
-#include "ffmpeg_wrappers.hpp"
+#include "FFmpegTranscoding.hpp"
 
 extern "C" {
 #include <libavutil/avutil.h>

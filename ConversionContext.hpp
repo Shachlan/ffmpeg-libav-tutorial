@@ -1,11 +1,10 @@
-#include "./ffmpeg_wrappers.hpp"
 extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 #include "libavutil/imgutils.h"
 }
-using std::unique_ptr;
-using std::weak_ptr;
 
 struct ConversionContext {
   static ConversionContext *create_encoding_conversion_context(AVCodecContext *context);

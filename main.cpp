@@ -10,6 +10,7 @@ extern "C" {
 #include <string.h>
 #include "./ConversionContext.hpp"
 #include "./openGLShading.h"
+#include "Decoders.hpp"
 #include "Encoder.hpp"
 
 #define FRONTEND 0;

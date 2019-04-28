@@ -1,21 +1,4 @@
-#ifndef FFMPEG_TRANSCODING
-#define FFMPEG_TRANSCODING 1
-
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-}
-#include <string>
-using std::string;
-
-struct TranscodingComponents {
-  ~TranscodingComponents();
-  AVCodec *codec;
-  AVStream *stream;
-  AVCodecContext *context;
-  AVPacket *packet;
-  AVFrame *frame;
-};
+#include "FFmpegTranscoding.hpp"
 
 struct DecodingComponents : TranscodingComponents {
   static DecodingComponents *get_audio_decoder(string file_name);
@@ -34,5 +17,3 @@ struct VideoDecodingComponents : DecodingComponents {
   long next_pts;
   long pts_increase_betweem_frames;
 };
-
-#endif

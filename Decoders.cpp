@@ -1,19 +1,6 @@
-#include "ffmpeg_wrappers.hpp"
+#include "Decoders.hpp"
 
-extern "C" {
-#include <libavutil/avutil.h>
-#include <libavutil/opt.h>
-#include <libavutil/pixdesc.h>
-#include <libswscale/swscale.h>
-#include "libavutil/imgutils.h"
-}
-
-TranscodingComponents::~TranscodingComponents() {
-  av_frame_free(&frame);
-  av_packet_free(&packet);
-  avcodec_close(context);
-  avcodec_free_context(&context);
-}
+#include "FFmpegTranscoding.hpp"
 
 DecodingComponents::~DecodingComponents() {
   avformat_close_input(&format_context);
