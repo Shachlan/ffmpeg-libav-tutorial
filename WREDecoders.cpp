@@ -3,7 +3,7 @@
 
 #include "WREDecoders.hpp"
 
-#include "WREFFmpegTranscoding.hpp"
+#include "WRETranscodingComponents.hpp"
 #include "WREVideoFormatConverter.hpp"
 
 /// Components needed in order to decode media from a given file using FFmpeg. This struct cleanly
@@ -115,25 +115,12 @@ WREVideoDecodingComponents *WREVideoDecodingComponents::get_video_decoder(
   return decoder;
 }
 
-static int decode_single_packet(WREDecodingComponents *decoder) {
-  AVCodecContext *codec_context = decoder->context;
-  int response = avcodec_send_packet(codec_context, decoder->packet);
-
-  if (response < 0) {
-    log_error("DECODER: Error while sending a packet to the decoder: %s", av_err2str(response));
-    return response;
-  }
-
-  return avcodec_receive_frame(codec_context, decoder->frame);
-}
-
 void copy_frame(AVFrame *dst, const AVFrame *src) {
   av_frame_copy(dst, src);
   av_frame_copy_props(dst, src);
 }
 
 int WREVideoDecodingComponents::decode_next_frame() {
-  int result = 0;
   if (this->buffered_frame->pts >= this->next_pts) {
     copy_frame(this->frame, this->buffered_frame);
     this->frame->pts = this->next_pts;
@@ -141,24 +128,32 @@ int WREVideoDecodingComponents::decode_next_frame() {
     return 0;
   }
 
+  int result = WREDecodingComponents::decode_next_frame();
+  if (result == 0) {
+    av_frame_unref(this->buffered_frame);
+    copy_frame(this->buffered_frame, this->frame);
+    return this->decode_next_frame();
+  } else if (result == AVERROR_EOF &&
+             this->buffered_frame->pts + this->pts_increase_betweem_frames > this->next_pts) {
+    copy_frame(this->frame, this->buffered_frame);
+    this->next_pts += this->pts_increase_betweem_frames;
+    return 0;
+  }
+
+  return result;
+}
+
+int WREDecodingComponents::decode_next_frame() {
+  int result = 0;
   while (result >= 0) {
-    auto packet_to_send = this->packet;
     av_frame_unref(this->frame);
     result = avcodec_receive_frame(this->context, this->frame);
-    if (result == 0) {
-      av_frame_unref(this->buffered_frame);
-      copy_frame(this->buffered_frame, this->frame);
-      return this->decode_next_frame();
-    } else if (result == AVERROR_EOF &&
-               this->buffered_frame->pts + this->pts_increase_betweem_frames > this->next_pts) {
-      copy_frame(this->frame, this->buffered_frame);
-      this->next_pts += this->pts_increase_betweem_frames;
-      return 0;
-    } else if (result != AVERROR(EAGAIN)) {
+    if (result != AVERROR(EAGAIN)) {
       return result;
     }
 
     av_packet_unref(this->packet);
+    auto packet_to_send = this->packet;
     result = av_read_frame(this->format_context, this->packet);
     if (result == AVERROR_EOF) {
       packet_to_send = NULL;
@@ -170,30 +165,6 @@ int WREVideoDecodingComponents::decode_next_frame() {
     result = avcodec_send_packet(this->context, this->packet);
   }
 
-  return result;
-}
-
-int WREDecodingComponents::decode_next_frame() {
-  int result = 0;
-  while (result >= 0) {
-    result = av_read_frame(this->format_context, this->packet);
-    if (result == AVERROR_EOF) {
-      break;
-    }
-    if (this->packet->stream_index != this->stream->index) {
-      av_packet_unref(this->packet);
-      continue;
-    }
-
-    av_frame_unref(this->frame);
-    result = decode_single_packet(this);
-    if (result == AVERROR(EAGAIN)) {
-      result = 0;
-      av_packet_unref(this->packet);
-      continue;
-    }
-    break;
-  }
   return result;
 }
 
@@ -223,7 +194,7 @@ WRETranscodingComponents *WREAudioDecoder::get_transcoding_components() {
   return internal_decoder;
 }
 
-int WREAudioDecoder::decode_next_frame() {
+int WREDecoder::decode_next_frame() {
   return internal_decoder->decode_next_frame();
 }
 

@@ -12,7 +12,7 @@ extern "C" {
 #include "libavutil/imgutils.h"
 }
 
-#include "WREFFmpegTranscoding.hpp"
+#include "WRETranscodingComponents.hpp"
 #include "WREVideoFormatConverter.hpp"
 
 static int prepare_video_encoder(WRETranscodingComponents *encoder, AVFormatContext *format_context,
