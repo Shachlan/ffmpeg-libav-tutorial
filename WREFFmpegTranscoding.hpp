@@ -1,3 +1,6 @@
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
+
 #pragma once
 
 extern "C" {
@@ -14,4 +17,5 @@ struct WRETranscodingComponents {
   AVCodecContext *context;
   AVPacket *packet;
   AVFrame *frame;
+  AVRational latest_time_base;
 };

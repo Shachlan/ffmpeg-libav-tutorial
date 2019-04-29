@@ -1,3 +1,6 @@
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
+
 #include "WREEncoder.hpp"
 
 extern "C" {
@@ -104,7 +107,6 @@ static int prepare_audio_encoder(WRETranscodingComponents *encoder, AVFormatCont
 WREEncoder::WREEncoder(string file_name, string video_codec_name, int video_width, int video_height,
                        double video_framerate, WRETranscodingComponents *audio_decoder) {
   video_encoder = new WRETranscodingComponents();
-  audio_encoder = new WRETranscodingComponents();
 
   avformat_alloc_output_context2(&format_context, NULL, NULL, file_name.c_str());
   if (!format_context) {
@@ -116,9 +118,13 @@ WREEncoder::WREEncoder(string file_name, string video_codec_name, int video_widt
     throw "error while preparing video encoder";
   }
 
-  log_error("audio encoder");
-  if (prepare_audio_encoder(audio_encoder, format_context, audio_decoder)) {
-    throw "error while preparing audio copy";
+  if (audio_decoder != nullptr) {
+    audio_encoder = new WRETranscodingComponents();
+    if (prepare_audio_encoder(audio_encoder, format_context, audio_decoder) != 0) {
+      throw "error while preparing audio copy";
+    }
+  } else {
+    audio_encoder = nullptr;
   }
 
   if (format_context->oformat->flags & AVFMT_GLOBALHEADER)
@@ -139,6 +145,7 @@ WREEncoder::WREEncoder(string file_name, string video_codec_name, int video_widt
 static int encode_frame(WRETranscodingComponents *encoder, AVFormatContext *format_context,
                         AVRational source_time_base, AVFrame *frame) {
   AVCodecContext *codec_context = encoder->context;
+  encoder->latest_time_base = source_time_base;
 
   int ret;
   ret = avcodec_send_frame(codec_context, frame);
@@ -179,8 +186,10 @@ int WREEncoder::encode_audio_frame(double source_time_base, long source_timestam
 }
 
 int WREEncoder::finish_encoding() {
-  encode_frame(video_encoder, format_context, video_encoder->stream->time_base, NULL);
-  encode_frame(audio_encoder, format_context, audio_encoder->stream->time_base, NULL);
+  encode_frame(video_encoder, format_context, video_encoder->latest_time_base, NULL);
+  if (audio_encoder != nullptr) {
+    encode_frame(audio_encoder, format_context, audio_encoder->latest_time_base, NULL);
+  }
   av_write_trailer(format_context);
   return 0;
 }

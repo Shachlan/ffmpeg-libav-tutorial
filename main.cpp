@@ -6,6 +6,9 @@
 #include "./openGLShading.h"
 #include "WREDecoders.hpp"
 #include "WREEncoder.hpp"
+extern "C" {
+#include <libavutil/log.h>
+}
 
 #define FRONTEND 0;
 
@@ -25,6 +28,7 @@ static void blend_frames(WREVideoDecoder *decoder, WREVideoDecoder *secondary_de
 }
 
 int main(int argc, char *argv[]) {
+  av_log_set_level(AV_LOG_FATAL);
   log_debug("start");
   int height = 1200;
   int width = 1920;

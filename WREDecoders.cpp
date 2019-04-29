@@ -1,3 +1,6 @@
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
+
 #include "WREDecoders.hpp"
 
 #include "WREFFmpegTranscoding.hpp"
@@ -124,38 +127,49 @@ static int decode_single_packet(WREDecodingComponents *decoder) {
   return avcodec_receive_frame(codec_context, decoder->frame);
 }
 
+void copy_frame(AVFrame *dst, const AVFrame *src) {
+  av_frame_copy(dst, src);
+  av_frame_copy_props(dst, src);
+}
+
 int WREVideoDecodingComponents::decode_next_frame() {
   int result = 0;
   if (this->buffered_frame->pts >= this->next_pts) {
-    av_frame_copy(this->frame, this->buffered_frame);
-    av_frame_copy_props(this->frame, this->buffered_frame);
+    copy_frame(this->frame, this->buffered_frame);
     this->frame->pts = this->next_pts;
     this->next_pts += this->pts_increase_betweem_frames;
     return 0;
   }
 
   while (result >= 0) {
+    auto packet_to_send = this->packet;
+    av_frame_unref(this->frame);
+    result = avcodec_receive_frame(this->context, this->frame);
+    if (result == 0) {
+      av_frame_unref(this->buffered_frame);
+      copy_frame(this->buffered_frame, this->frame);
+      return this->decode_next_frame();
+    } else if (result == AVERROR_EOF &&
+               this->buffered_frame->pts + this->pts_increase_betweem_frames > this->next_pts) {
+      copy_frame(this->frame, this->buffered_frame);
+      this->next_pts += this->pts_increase_betweem_frames;
+      return 0;
+    } else if (result != AVERROR(EAGAIN)) {
+      return result;
+    }
+
     av_packet_unref(this->packet);
     result = av_read_frame(this->format_context, this->packet);
     if (result == AVERROR_EOF) {
-      break;
+      packet_to_send = NULL;
     }
-    if (this->packet->stream_index != this->stream->index) {
+    if (packet_to_send != NULL && packet_to_send->stream_index != this->stream->index) {
       continue;
     }
 
-    av_frame_unref(this->frame);
-    result = decode_single_packet(this);
-    if (result == AVERROR(EAGAIN)) {
-      result = 0;
-      continue;
-    }
-
-    av_frame_unref(this->buffered_frame);
-    av_frame_copy(this->buffered_frame, this->frame);
-    av_frame_copy_props(this->buffered_frame, this->frame);
-    return this->decode_next_frame();
+    result = avcodec_send_packet(this->context, this->packet);
   }
+
   return result;
 }
 
