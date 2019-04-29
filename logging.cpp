@@ -1,16 +1,18 @@
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <boost/date_time/posix_time/posix_time.hpp>
+
+using namespace boost::posix_time;
 
 void log(const string fmt, const string log_level, ...) {
   va_list args;
   fprintf(stdout, "{\"level\": \"%s\",", log_level.c_str());
-  time_t t;
-  time(&t);
-  tm *lt = localtime(&t);
-  fprintf(stdout, "\"time\": %02d/%02d/%04d %02d:%02d:%02d, ", lt->tm_mday, lt->tm_mon + 1,
-          1900 + lt->tm_year, lt->tm_hour, lt->tm_min, lt->tm_sec);
+  ptime t = microsec_clock::universal_time();
+  fprintf(stdout, "\"time\": %sZ, ", to_iso_extended_string(t).c_str());
   fprintf(stdout, "\"message\": \"");
   va_start(args, log_level);
   vfprintf(stdout, fmt.c_str(), args);
