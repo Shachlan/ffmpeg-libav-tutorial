@@ -1,4 +1,4 @@
-#include "WREFFmpegTranscoding.hpp"
+#include "WRETranscodingComponents.hpp"
 
 extern "C" {
 #include <libavutil/avutil.h>

@@ -1,3 +1,6 @@
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
+
 struct WRETranscodingComponents;
 struct AVFormatContext;
 struct WREVideoFormatConverter;
@@ -18,15 +21,16 @@ public:
              double video_framerate, WRETranscodingComponents *audio_decoder);
   ~WREEncoder();
 
-  /// Returns a data buffer sized 3 * width * height, that will be encoded as an RGB frame.
+  /// Returns a data buffer sized 3 * width * height. This data should be populated with RGB pixel
+  /// information before calls to \c encode_video_frame.
   uint8_t *get_rgb_buffer();
 
   /// Encodes the information in the internal data buffer as a video frame timestamped as
-  /// source_timestamp * source_time_base;
+  /// source_timestamp * source_time_base. Returns 0 if encoding succeeded.
   int encode_video_frame(double source_time_base, long source_timestamp);
 
   /// Encodes the information in the shared internal audio data buffer as an audio frame timestamped
-  /// as source_timestamp * source_time_base;
+  /// as source_timestamp * source_time_base. Returns 0 if encoding succeeded.
   int encode_audio_frame(double source_time_base, long source_timestamp);
 
   /// Closes the encoder for

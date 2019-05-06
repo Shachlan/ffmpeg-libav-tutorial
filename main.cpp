@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
   int width = 1920;
   auto expected_framerate = 30;
 
-  auto decoder = new WREVideoDecoder(argv[1], expected_framerate);
+  auto decoder = new WREVideoDecoder(argv[1], expected_framerate, 1, 5, 2);
   if (decoder == nullptr) {
     log_error("error while preparing input");
     return -1;
@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
   }
 
   log_info("audio decoder");
-  auto audio_decoder = new WREAudioDecoder(argv[1]);
+  auto audio_decoder = new WREAudioDecoder(argv[1], 1, 4, 2);
   if (audio_decoder == nullptr) {
     log_error("error while preparing audio input");
     return -1;

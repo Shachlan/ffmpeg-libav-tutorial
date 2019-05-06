@@ -12,8 +12,10 @@ extern "C" {
 #include "libavutil/imgutils.h"
 }
 
-#include "WREFFmpegTranscoding.hpp"
+#include "WRETranscodingComponents.hpp"
 #include "WREVideoFormatConverter.hpp"
+
+#pragma region initialization
 
 static int prepare_video_encoder(WRETranscodingComponents *encoder, AVFormatContext *format_context,
                                  int width, int height, string codec_name,
@@ -106,6 +108,7 @@ static int prepare_audio_encoder(WRETranscodingComponents *encoder, AVFormatCont
 
 WREEncoder::WREEncoder(string file_name, string video_codec_name, int video_width, int video_height,
                        double video_framerate, WRETranscodingComponents *audio_decoder) {
+  log_info("Opening encoder for %s", file_name.c_str());
   video_encoder = new WRETranscodingComponents();
 
   avformat_alloc_output_context2(&format_context, NULL, NULL, file_name.c_str());
@@ -142,6 +145,9 @@ WREEncoder::WREEncoder(string file_name, string video_codec_name, int video_widt
       WREVideoFormatConverter::create_encoding_conversion_context(video_encoder->context);
 }
 
+#pragma endregion
+#pragma region encoding
+
 static int encode_frame(WRETranscodingComponents *encoder, AVFormatContext *format_context,
                         AVRational source_time_base, AVFrame *frame) {
   AVCodecContext *codec_context = encoder->context;
@@ -156,7 +162,7 @@ static int encode_frame(WRETranscodingComponents *encoder, AVFormatContext *form
     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
       break;
     } else if (ret < 0) {
-      log_error("ENCODING: Error while receiving a packet from the encoder: %s", av_err2str(ret));
+      log_error("ENCODING: Error %d while receiving a packet from the encoder", ret);
       return -1;
     }
 
@@ -165,7 +171,7 @@ static int encode_frame(WRETranscodingComponents *encoder, AVFormatContext *form
     ret = av_interleaved_write_frame(format_context, encoder->packet);
 
     if (ret != 0) {
-      log_error("Error %d while receiving a packet from the decoder: %s", ret, av_err2str(ret));
+      log_error("Error %d while writing a frame", ret);
     }
   }
   av_packet_unref(encoder->packet);
@@ -186,6 +192,7 @@ int WREEncoder::encode_audio_frame(double source_time_base, long source_timestam
 }
 
 int WREEncoder::finish_encoding() {
+  log_info("finish encoding");
   encode_frame(video_encoder, format_context, video_encoder->latest_time_base, NULL);
   if (audio_encoder != nullptr) {
     encode_frame(audio_encoder, format_context, audio_encoder->latest_time_base, NULL);
@@ -193,6 +200,9 @@ int WREEncoder::finish_encoding() {
   av_write_trailer(format_context);
   return 0;
 }
+
+#pragma endregion
+#pragma region getters
 
 uint8_t *WREEncoder::get_rgb_buffer() {
   return this->video_conversion_context->get_rgb_buffer();
@@ -213,3 +223,5 @@ WREEncoder::~WREEncoder() {
   avformat_close_input(&format_context);
   avformat_free_context(format_context);
 }
+
+#pragma endregion
