@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "./openGLShading.h"
+#include "./openGLShading.hpp"
 #include "WREDecoders.hpp"
 #include "WREEncoder.hpp"
 extern "C" {

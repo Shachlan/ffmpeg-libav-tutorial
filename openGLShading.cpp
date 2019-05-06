@@ -1,4 +1,4 @@
-#include "openGLShading.h"
+#include "openGLShading.hpp"
 
 #include <string>
 
