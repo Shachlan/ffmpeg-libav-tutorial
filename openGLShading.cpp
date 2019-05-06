@@ -20,43 +20,11 @@
 
 #endif
 
-static std::string vertex_shader_text =
-    "attribute vec2 position;\n"
-    "attribute vec2 texCoord;\n"
-    "varying vec2 vTexCoord;\n"
-    "void main(void) {\n"
-    "    gl_Position = vec4(position, 0, 1);\n"
-    "    vTexCoord = texCoord;\n"
-    "}\n";
+#include "WREShaderPool.hpp"
 
-static std::string invert_shader_text =
-#if FRONTEND == 1
-    "precision mediump float;\n"
-#endif
-    "uniform sampler2D tex;\n"
-    "varying vec2 vTexCoord;\n"
-    "void main() {\n"
-    "    const vec3 kInvert = vec3(1, 1, 1);\n"
-    "    gl_FragColor = vec4(kInvert - texture2D(tex, vTexCoord).rgb, 1);\n"
-    "}\n";
-
-static std::string blend_shader_text =
-#if FRONTEND == 1
-    "precision mediump float;\n"
-#endif
-    "uniform sampler2D tex1;\n"
-    "uniform sampler2D tex2;\n"
-    "uniform float blendFactor;\n"
-    "varying vec2 vTexCoord;\n"
-    "\n"
-    "void main() {\n"
-    "    vec4 color1 = texture2D(tex1, vTexCoord);\n"
-    "    vec4 color2 = texture2D(tex2, vTexCoord);\n"
-    "    gl_FragColor = (color1 * blendFactor) + (color2 * (1.0 - blendFactor));\n"
-    "}\n";
+static WREShaderPool shader_pool;
 
 typedef struct {
-  GLuint program;
   GLuint position_buffer;
   GLuint texture_buffer;
 } ProgramInfo;
@@ -86,27 +54,6 @@ uint32_t createTexture() {
   return textureLoc;
 }
 
-static GLuint build_shader(const GLchar *shader_source, GLenum type) {
-  GLuint shader = glCreateShader(type);
-  if (!shader || !glIsShader(shader)) {
-    return 0;
-  }
-  glShaderSource(shader, 1, &shader_source, 0);
-  glCompileShader(shader);
-  GLint status;
-  glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-  if (status == GL_TRUE) {
-    return shader;
-  }
-  GLint logSize = 0;
-  glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logSize);
-  GLchar *errorLog = (GLchar *)calloc(logSize, sizeof(GLchar));
-  glGetShaderInfoLog(shader, logSize, NULL, errorLog);
-  printf("%s", errorLog);
-  free(errorLog);
-  return 0;
-}
-
 static GLuint position_buffer_setup(GLuint program) {
   GLuint positionBuf;
   glGenBuffers(1, &positionBuf);
@@ -131,42 +78,29 @@ static GLuint texture_buffer_setup(GLuint program) {
   return texturesBuffer;
 }
 
-static int build_program(std::string *vertex_shader, std::string *fragment_shader) {
-  GLuint v_shader, f_shader;
-
-  if (!((v_shader = build_shader(vertex_shader->c_str(), GL_VERTEX_SHADER)) &&
-        (f_shader = build_shader(fragment_shader->c_str(), GL_FRAGMENT_SHADER)))) {
-    return -1;
-  }
-
-  GLuint program = glCreateProgram();
-  glAttachShader(program, v_shader);
-  glAttachShader(program, f_shader);
-  glLinkProgram(program);
-
-  GLint status;
-  glGetProgramiv(program, GL_LINK_STATUS, &status);
-  if (status != GL_TRUE) {
-    exit(1);
-  }
-  return program;
+GLuint get_invert_program() {
+  return shader_pool.get_program("passthrough", "invert");
 }
 
 ProgramInfo build_invert_program() {
-  GLuint program = build_program(&vertex_shader_text, &invert_shader_text);
+  GLuint program = get_invert_program();
   glUseProgram(program);
   GLuint position_buffer = position_buffer_setup(program);
   GLuint texture_buffer = texture_buffer_setup(program);
-  return (ProgramInfo){program, position_buffer, texture_buffer};
+  return (ProgramInfo){position_buffer, texture_buffer};
+}
+
+GLuint get_blend_program() {
+  return shader_pool.get_program("passthrough", "blend");
 }
 
 ProgramInfo build_blend_program(float blend_ratio) {
-  GLuint program = build_program(&vertex_shader_text, &blend_shader_text);
+  GLuint program = get_blend_program();
   glUseProgram(program);
   glUniform1f(glGetUniformLocation(program, "blendFactor"), blend_ratio);
   GLuint position_buffer = position_buffer_setup(program);
   GLuint texture_buffer = texture_buffer_setup(program);
-  return (ProgramInfo){program, position_buffer, texture_buffer};
+  return (ProgramInfo){position_buffer, texture_buffer};
 }
 
 void setupOpenGL(int width, int height, float blend_ratio, char *canvasName) {
@@ -202,15 +136,17 @@ void loadTexture(uint32_t textureID, int width, int height, uint8_t *buffer) {
 }
 
 void invertFrame(uint32_t textureID) {
-  glUseProgram(invert_program.program);
-  glUniform1i(glGetUniformLocation(invert_program.program, "tex"), textureID);
+  auto program = get_invert_program();
+  glUseProgram(program);
+  glUniform1i(glGetUniformLocation(program, "tex"), textureID);
   glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
 void blendFrames(uint32_t texture1ID, uint32_t texture2ID) {
-  glUseProgram(blend_program.program);
-  glUniform1i(glGetUniformLocation(blend_program.program, "tex1"), texture1ID);
-  glUniform1i(glGetUniformLocation(blend_program.program, "tex2"), texture2ID);
+  auto program = get_blend_program();
+  glUseProgram(program);
+  glUniform1i(glGetUniformLocation(program, "tex1"), texture1ID);
+  glUniform1i(glGetUniformLocation(program, "tex2"), texture2ID);
   glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
@@ -219,9 +155,11 @@ void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
 }
 
 void tearDownOpenGL() {
-  glDeleteProgram(invert_program.program);
   glDeleteBuffers(1, &invert_program.position_buffer);
   glDeleteBuffers(1, &invert_program.texture_buffer);
+  glDeleteBuffers(1, &blend_program.position_buffer);
+  glDeleteBuffers(1, &blend_program.texture_buffer);
+  shader_pool.clear();
 #if FRONTEND == 0
   glfwDestroyWindow(window);
 #endif

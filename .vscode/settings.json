@@ -41,7 +41,27 @@
         "queue": "c",
         "random": "c",
         "variant": "c",
-        "regex": "cpp"
+        "regex": "cpp",
+        "*.tcc": "cpp",
+        "cctype": "cpp",
+        "clocale": "cpp",
+        "cmath": "cpp",
+        "cstdint": "cpp",
+        "cstdio": "cpp",
+        "cstdlib": "cpp",
+        "cwchar": "cpp",
+        "iosfwd": "cpp",
+        "limits": "cpp",
+        "cinttypes": "cpp",
+        "map": "cpp",
+        "unordered_map": "cpp",
+        "cwctype": "cpp",
+        "vector": "cpp",
+        "system_error": "cpp",
+        "fstream": "cpp",
+        "ostream": "cpp",
+        "sstream": "cpp",
+        "streambuf": "cpp"
     },
     "git.ignoreLimitWarning": true
 }
