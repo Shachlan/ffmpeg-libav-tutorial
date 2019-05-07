@@ -64,8 +64,8 @@ int main(int argc, char *argv[]) {
   int length = atoi(argv[6]);
 
   setupOpenGL(width, height, blendRatio, NULL);
-  uint32_t tex1 = createTexture();
-  uint32_t tex2 = createTexture();
+  uint32_t tex1 = get_texture();
+  uint32_t tex2 = get_texture();
 
   double source_time_base = decoder->get_time_base();
   double duration_in_seconds = secondary_decoder->get_duration();

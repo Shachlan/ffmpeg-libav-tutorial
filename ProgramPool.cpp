@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <vector>
 
 #if FRONTEND == 1
 #include <GLES2/gl2.h>
@@ -11,16 +12,10 @@
 #endif
 
 using namespace WREOpenGL;
-using std::unordered_map;
 
-void ProgramPool::delete_program(int program_name) {
+void ProgramPool::delete_program(GLuint program_name) {
   auto shaders = this->name_to_shader_names_mapping[program_name];
   auto description = this->name_to_description_mapping[program_name];
-
-  this->description_to_name_mapping.erase(description);
-  this->name_to_shader_names_mapping.erase(program_name);
-  this->name_to_description_mapping.erase(program_name);
-  this->program_reference_count.erase(program_name);
 
   glDeleteProgram(program_name);
   glDeleteShader(shaders.first);
@@ -28,11 +23,21 @@ void ProgramPool::delete_program(int program_name) {
 }
 
 void ProgramPool::flush() {
+  std::vector<GLuint> names_to_remove;
   for (auto &pair : program_reference_count) {
     if (pair.second > 0) {
       continue;
     }
     delete_program(pair.first);
+    names_to_remove.insert(names_to_remove.end(), pair.first);
+  }
+
+  for (auto &name : names_to_remove) {
+    auto description = this->name_to_description_mapping[name];
+    this->description_to_name_mapping.erase(description);
+    this->name_to_shader_names_mapping.erase(name);
+    this->name_to_description_mapping.erase(name);
+    this->program_reference_count.erase(name);
   }
 }
 
@@ -40,6 +45,11 @@ void ProgramPool::clear() {
   for (auto &pair : name_to_description_mapping) {
     delete_program(pair.first);
   }
+
+  this->description_to_name_mapping.clear();
+  this->name_to_shader_names_mapping.clear();
+  this->name_to_description_mapping.clear();
+  this->program_reference_count.clear();
 }
 
 static GLuint build_shader(const GLchar *shader_source, GLenum shader_type) {
@@ -85,7 +95,7 @@ string get_shader_filename(string shader, GLenum shader_type) {
   return shader + (shader_type == GL_VERTEX_SHADER ? ".vsh" : ".fsh");
 }
 
-int create_program(int vertex_shader, int fragment_shader) {
+GLuint create_program(GLuint vertex_shader, GLuint fragment_shader) {
   log_debug("creating program %d , %d", vertex_shader, fragment_shader);
   GLuint program = glCreateProgram();
   glAttachShader(program, vertex_shader);
@@ -97,6 +107,7 @@ int create_program(int vertex_shader, int fragment_shader) {
   if (status != GL_TRUE) {
     exit(1);
   }
+  log_debug("create program %d", program);
   return program;
 }
 
@@ -104,12 +115,10 @@ string get_key(string vertex_shader, string fragment_shader) {
   return "vertx:" + vertex_shader + ".fragment:" + fragment_shader;
 }
 
-GLint ProgramPool::get_program(string vertex_shader, string fragment_shader) {
+GLuint ProgramPool::get_program(string vertex_shader, string fragment_shader) {
   auto key = get_key(vertex_shader, fragment_shader);
   auto search = this->description_to_name_mapping.find(key);
   if (search != this->description_to_name_mapping.end()) {
-    log_debug("reference count for %s is %d", key.c_str(),
-              this->program_reference_count[search->second]);
     this->program_reference_count[search->second]++;
     return search->second;
   }
@@ -128,6 +137,6 @@ GLint ProgramPool::get_program(string vertex_shader, string fragment_shader) {
   return program;
 }
 
-void ProgramPool::release_program(int program_name) {
+void ProgramPool::release_program(GLuint program_name) {
   program_reference_count[program_name]--;
 }

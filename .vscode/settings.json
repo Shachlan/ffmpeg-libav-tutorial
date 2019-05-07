@@ -61,7 +61,9 @@
         "fstream": "cpp",
         "ostream": "cpp",
         "sstream": "cpp",
-        "streambuf": "cpp"
+        "streambuf": "cpp",
+        "set": "cpp",
+        "unordered_set": "cpp"
     },
     "git.ignoreLimitWarning": true
 }

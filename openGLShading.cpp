@@ -21,10 +21,12 @@
 #endif
 
 #include "ProgramPool.hpp"
+#include "TexturePool.hpp"
 
 using namespace WREOpenGL;
 
-static ProgramPool shader_pool;
+static ProgramPool program_pool;
+static TexturePool texture_pool;
 
 typedef struct {
   GLuint position_buffer;
@@ -43,17 +45,8 @@ static const float position[12] = {-1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f,
 static const float textureCoords[12] = {0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
                                         0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f};
 
-uint32_t createTexture() {
-  GLuint textureLoc;
-  glGenTextures(1, &textureLoc);
-  glActiveTexture(GL_TEXTURE0 + textureLoc);
-
-  glBindTexture(GL_TEXTURE_2D, textureLoc);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  return textureLoc;
+uint32_t get_texture() {
+  return texture_pool.get_texture();
 }
 
 static GLuint position_buffer_setup(GLuint program) {
@@ -81,7 +74,7 @@ static GLuint texture_buffer_setup(GLuint program) {
 }
 
 GLuint get_invert_program() {
-  return shader_pool.get_program("passthrough", "invert");
+  return program_pool.get_program("passthrough", "invert");
 }
 
 ProgramInfo build_invert_program() {
@@ -93,7 +86,7 @@ ProgramInfo build_invert_program() {
 }
 
 GLuint get_blend_program() {
-  return shader_pool.get_program("passthrough", "blend");
+  return program_pool.get_program("passthrough", "blend");
 }
 
 ProgramInfo build_blend_program(float blend_ratio) {
@@ -161,8 +154,11 @@ void tearDownOpenGL() {
   glDeleteBuffers(1, &invert_program.texture_buffer);
   glDeleteBuffers(1, &blend_program.position_buffer);
   glDeleteBuffers(1, &blend_program.texture_buffer);
-  shader_pool.clear();
+  log_debug("releasing programs");
+  program_pool.clear();
 #if FRONTEND == 0
+  log_debug("releasing textures");
+  texture_pool.clear();
   glfwDestroyWindow(window);
 #endif
 }
