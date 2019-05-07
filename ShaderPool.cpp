@@ -1,5 +1,5 @@
 
-#include "WREShaderPool.hpp"
+#include "ShaderPool.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -10,10 +10,10 @@
 #include <OpenGL/gl3.h>
 #endif
 
-using std::pair;
+using namespace WREOpenGL;
 using std::unordered_map;
 
-void WREShaderPool::clear() {
+void ShaderPool::clear() {
   for (auto &pair : identifier_to_shaders_mapping) {
     glDeleteProgram(pair.first);
   }
@@ -92,7 +92,7 @@ string get_key(string vertex_shader, string fragment_shader) {
   return "vertx:" + vertex_shader + ".fragment:" + fragment_shader;
 }
 
-GLint WREShaderPool::get_program(string vertex_shader, string fragment_shader) {
+GLint ShaderPool::get_program(string vertex_shader, string fragment_shader) {
   auto key = get_key(vertex_shader, fragment_shader);
   auto search = this->shaders_to_identifier_mapping.find(key);
   if (search != this->shaders_to_identifier_mapping.end()) {
@@ -112,7 +112,7 @@ GLint WREShaderPool::get_program(string vertex_shader, string fragment_shader) {
   return program;
 }
 
-// void WREShaderPool::delete_program(int program_identifier) {
+// void ShaderPool::delete_program(int program_identifier) {
 //   auto search_identifier = this->identifier_to_shaders_mapping.find(program_identifier);
 //   if (search_identifier == this->identifier_to_shaders_mapping.end()) {
 //     throw "Could not find wanted program";

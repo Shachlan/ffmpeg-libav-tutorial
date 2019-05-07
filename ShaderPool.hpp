@@ -1,7 +1,8 @@
 
 #include <unordered_map>
 
-class WREShaderPool {
+namespace WREOpenGL {
+class ShaderPool {
 public:
   int get_program(string vertex_shader, string fragment_shader);
   int release_program(string vertex_shader, string fragment_shader);
@@ -14,3 +15,4 @@ private:
   std::unordered_map<int, int> program_reference_count;
   std::unordered_map<int, int> shader_reference_count;
 };
+}  // namespace WREOpenGL
