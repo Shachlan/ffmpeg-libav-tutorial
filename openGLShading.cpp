@@ -20,11 +20,11 @@
 
 #endif
 
-#include "ShaderPool.hpp"
+#include "ProgramPool.hpp"
 
 using namespace WREOpenGL;
 
-static ShaderPool shader_pool;
+static ProgramPool shader_pool;
 
 typedef struct {
   GLuint position_buffer;

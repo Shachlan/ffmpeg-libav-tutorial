@@ -1,5 +1,5 @@
 
-#include "ShaderPool.hpp"
+#include "ProgramPool.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -13,15 +13,33 @@
 using namespace WREOpenGL;
 using std::unordered_map;
 
-void ShaderPool::clear() {
-  for (auto &pair : identifier_to_shaders_mapping) {
-    glDeleteProgram(pair.first);
+void ProgramPool::delete_program(int program_name) {
+  auto shaders = this->name_to_shader_names_mapping[program_name];
+  auto description = this->name_to_description_mapping[program_name];
+
+  this->description_to_name_mapping.erase(description);
+  this->name_to_shader_names_mapping.erase(program_name);
+  this->name_to_description_mapping.erase(program_name);
+  this->program_reference_count.erase(program_name);
+
+  glDeleteProgram(program_name);
+  glDeleteShader(shaders.first);
+  glDeleteShader(shaders.second);
+}
+
+void ProgramPool::flush() {
+  for (auto &pair : program_reference_count) {
+    if (pair.second > 0) {
+      continue;
+    }
+    delete_program(pair.first);
   }
-  for (auto &pair : shader_mapping) {
-    glDeleteShader(pair.second);
+}
+
+void ProgramPool::clear() {
+  for (auto &pair : name_to_description_mapping) {
+    delete_program(pair.first);
   }
-  identifier_to_shaders_mapping.clear();
-  shaders_to_identifier_mapping.clear();
 }
 
 static GLuint build_shader(const GLchar *shader_source, GLenum shader_type) {
@@ -53,20 +71,14 @@ static string get_shader_text(string shader_file_name) {
   return buffer.str();
 }
 
-int get_shader(string shader_file_name, GLenum shader_type,
-               unordered_map<string, int> &shader_mapping) {
-  auto search = shader_mapping.find(shader_file_name);
-  if (search != shader_mapping.end()) {
-    return search->second;
-  }
-
+int build_shader(string shader_file_name, GLenum shader_type) {
   auto text = get_shader_text(shader_file_name);
-  auto shader_identifier = build_shader(text.c_str(), shader_type);
-  if (shader_identifier == 0) {
+  auto shader_name = build_shader(text.c_str(), shader_type);
+  if (shader_name == 0) {
     throw "failed to build shader";
   }
-  shader_mapping[shader_file_name] = shader_identifier;
-  return shader_identifier;
+
+  return shader_name;
 }
 
 string get_shader_filename(string shader, GLenum shader_type) {
@@ -92,36 +104,30 @@ string get_key(string vertex_shader, string fragment_shader) {
   return "vertx:" + vertex_shader + ".fragment:" + fragment_shader;
 }
 
-GLint ShaderPool::get_program(string vertex_shader, string fragment_shader) {
+GLint ProgramPool::get_program(string vertex_shader, string fragment_shader) {
   auto key = get_key(vertex_shader, fragment_shader);
-  auto search = this->shaders_to_identifier_mapping.find(key);
-  if (search != this->shaders_to_identifier_mapping.end()) {
+  auto search = this->description_to_name_mapping.find(key);
+  if (search != this->description_to_name_mapping.end()) {
+    log_debug("reference count for %s is %d", key.c_str(),
+              this->program_reference_count[search->second]);
+    this->program_reference_count[search->second]++;
     return search->second;
   }
 
   auto v_shader_filename = get_shader_filename(vertex_shader, GL_VERTEX_SHADER);
-  auto v_shader_identifier = get_shader(v_shader_filename, GL_VERTEX_SHADER, this->shader_mapping);
+  auto v_shader_name = build_shader(v_shader_filename, GL_VERTEX_SHADER);
   auto f_shader_filename = get_shader_filename(fragment_shader, GL_FRAGMENT_SHADER);
-  auto f_shader_identifier =
-      get_shader(f_shader_filename, GL_FRAGMENT_SHADER, this->shader_mapping);
-  auto program = create_program(v_shader_identifier, f_shader_identifier);
+  auto f_shader_name = build_shader(f_shader_filename, GL_FRAGMENT_SHADER);
+  auto program = create_program(v_shader_name, f_shader_name);
 
-  this->shaders_to_identifier_mapping[key] = program;
-  this->identifier_to_shaders_mapping[program] = key;
+  this->description_to_name_mapping[key] = program;
+  this->name_to_shader_names_mapping[program] = std::pair<int, int>{v_shader_name, f_shader_name};
+  this->name_to_description_mapping[program] = key;
+  this->program_reference_count[program] = 1;
 
   return program;
 }
 
-// void ShaderPool::delete_program(int program_identifier) {
-//   auto search_identifier = this->identifier_to_shaders_mapping.find(program_identifier);
-//   if (search_identifier == this->identifier_to_shaders_mapping.end()) {
-//     throw "Could not find wanted program";
-//   }
-
-//   auto search_shaders = this->shaders_to_identifier_mapping.find(search_identifier->second);
-//   this->shaders_to_identifier_mapping.erase(this->shaders_to_identifier_mapping.begin(),
-//                                             search_shaders);
-//   this->identifier_to_shaders_mapping.erase(this->identifier_to_shaders_mapping.begin(),
-//                                             search_identifier);
-//   glDeleteProgram(program_identifier);
-// }
+void ProgramPool::release_program(int program_name) {
+  program_reference_count[program_name]--;
+}
