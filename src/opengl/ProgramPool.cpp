@@ -98,16 +98,20 @@ string get_shader_filename(string shader, GLenum shader_type) {
 GLuint create_program(GLuint vertex_shader, GLuint fragment_shader) {
   log_debug("creating program %d , %d", vertex_shader, fragment_shader);
   GLuint program = glCreateProgram();
+  log_debug("created program");
   glAttachShader(program, vertex_shader);
   glAttachShader(program, fragment_shader);
+  log_debug("attached shaders");
   glLinkProgram(program);
+  log_debug("linked program");
 
   GLint status;
   glGetProgramiv(program, GL_LINK_STATUS, &status);
+  log_debug("got status &d", status);
   if (status != GL_TRUE) {
     exit(1);
   }
-  log_debug("create program %d", program);
+  log_debug("created program %d", program);
   return program;
 }
 
