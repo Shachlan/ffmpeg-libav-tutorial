@@ -19,11 +19,12 @@ static void invert_single_frame(WREVideoDecoder *decoder, WREEncoder *encoder, u
 }
 
 static void blend_frames(WREVideoDecoder *decoder, WREVideoDecoder *secondary_decoder,
-                         WREEncoder *encoder, uint32_t texture1ID, uint32_t texture2ID) {
+                         WREEncoder *encoder, uint32_t texture1ID, uint32_t texture2ID,
+                         float blend_ratio) {
   loadTexture(texture1ID, decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
   loadTexture(texture2ID, secondary_decoder->get_width(), secondary_decoder->get_height(),
               secondary_decoder->get_rgb_buffer());
-  blendFrames(texture1ID, texture2ID);
+  blendFrames(texture1ID, texture2ID, blend_ratio);
   getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
 }
 
@@ -63,7 +64,7 @@ int main(int argc, char *argv[]) {
   int wait = atoi(argv[5]);
   int length = atoi(argv[6]);
 
-  setupOpenGL(width, height, blendRatio, NULL);
+  setupOpenGL(width, height, NULL);
   uint32_t tex1 = get_texture();
   uint32_t tex2 = get_texture();
 
@@ -97,7 +98,8 @@ int main(int argc, char *argv[]) {
     }
 
     blended_frames++;
-    blend_frames(decoder, secondary_decoder, encoder, tex1, tex2);
+    blend_frames(decoder, secondary_decoder, encoder, tex1, tex2,
+                 (float)decoder->get_current_timestamp() * decoder->get_time_base() / 5);
     encoder->encode_video_frame(source_time_base, decoder->get_current_timestamp());
   }
 

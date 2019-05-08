@@ -89,16 +89,15 @@ GLuint get_blend_program() {
   return program_pool.get_program("passthrough", "blend");
 }
 
-ProgramInfo build_blend_program(float blend_ratio) {
+ProgramInfo build_blend_program() {
   GLuint program = get_blend_program();
   glUseProgram(program);
-  glUniform1f(glGetUniformLocation(program, "blendFactor"), blend_ratio);
   GLuint position_buffer = position_buffer_setup(program);
   GLuint texture_buffer = texture_buffer_setup(program);
   return (ProgramInfo){position_buffer, texture_buffer};
 }
 
-void setupOpenGL(int width, int height, float blend_ratio, char *canvasName) {
+void setupOpenGL(int width, int height, char *canvasName) {
 #if FRONTEND == 1
   EmscriptenWebGLContextAttributes attrs;
   attrs.explicitSwapControl = 0;
@@ -121,7 +120,7 @@ void setupOpenGL(int width, int height, float blend_ratio, char *canvasName) {
 #endif
   glViewport(0, 0, width, height);
   invert_program = build_invert_program();
-  blend_program = build_blend_program(blend_ratio);
+  blend_program = build_blend_program();
 }
 
 void loadTexture(uint32_t textureID, int width, int height, uint8_t *buffer) {
@@ -137,9 +136,11 @@ void invertFrame(uint32_t textureID) {
   glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-void blendFrames(uint32_t texture1ID, uint32_t texture2ID) {
+void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
   auto program = get_blend_program();
   glUseProgram(program);
+  glUniform1f(glGetUniformLocation(program, "opacity"), blend_ratio);
+  glUniform1i(glGetUniformLocation(program, "blendMode"), 2);
   glUniform1i(glGetUniformLocation(program, "tex1"), texture1ID);
   glUniform1i(glGetUniformLocation(program, "tex2"), texture2ID);
   glDrawArrays(GL_TRIANGLES, 0, 6);

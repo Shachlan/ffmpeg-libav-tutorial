@@ -1,10 +1,10 @@
 #include <stdint.h>
 
-extern void setupOpenGL(int width, int height, float blend_ratio, char *canvasName);
+extern void setupOpenGL(int width, int height, char *canvasName);
 
 extern void invertFrame(uint32_t textureID);
 
-extern void blendFrames(uint32_t texture1ID, uint32_t texture2ID);
+extern void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio);
 
 extern void tearDownOpenGL();
 
