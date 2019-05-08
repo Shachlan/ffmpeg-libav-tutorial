@@ -1,16 +1,13 @@
 #include "TexturePool.hpp"
 
-#if FRONTEND == 1
-#include <GLES2/gl2.h>
-#else
-#include <OpenGL/gl3.h>
-#endif
+#include "opengl/OpenGLHeaders.hpp"
 
 using namespace WREOpenGL;
 
 GLuint create_texture() {
   GLuint textureLoc;
   glGenTextures(1, &textureLoc);
+  GLCheckDbg("Failed to generate texture");
   glActiveTexture(GL_TEXTURE0 + textureLoc);
 
   glBindTexture(GL_TEXTURE_2D, textureLoc);
@@ -18,6 +15,7 @@ GLuint create_texture() {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  GLCheckDbg("Failed to setup texture");
   return textureLoc;
 }
 

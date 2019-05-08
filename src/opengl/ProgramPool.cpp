@@ -5,11 +5,7 @@
 #include <sstream>
 #include <vector>
 
-#if FRONTEND == 1
-#include <GLES2/gl2.h>
-#else
-#include <OpenGL/gl3.h>
-#endif
+#include "opengl/OpenGLHeaders.hpp"
 
 using namespace WREOpenGL;
 
@@ -74,8 +70,10 @@ static GLuint build_shader(const GLchar *shader_source, GLenum shader_type) {
 }
 
 static string get_shader_text(string shader_file_name) {
-  log_debug("reading shader from %s", shader_file_name.c_str());
   std::ifstream stream(shader_file_name);
+  if (!stream.is_open()) {
+    throw_gl_exception("Can't open shader file %s", shader_file_name.c_str());
+  }
   std::stringstream buffer;
   buffer << stream.rdbuf();
   return buffer.str();
@@ -85,7 +83,8 @@ int build_shader(string shader_file_name, GLenum shader_type) {
   auto text = get_shader_text(shader_file_name);
   auto shader_name = build_shader(text.c_str(), shader_type);
   if (shader_name == 0) {
-    throw "failed to build shader";
+    GLCheckDbg("Failed to build shader");
+    throw_gl_exception("Failed to build shader");
   }
 
   return shader_name;
@@ -96,22 +95,18 @@ string get_shader_filename(string shader, GLenum shader_type) {
 }
 
 GLuint create_program(GLuint vertex_shader, GLuint fragment_shader) {
-  log_debug("creating program %d , %d", vertex_shader, fragment_shader);
   GLuint program = glCreateProgram();
-  log_debug("created program");
   glAttachShader(program, vertex_shader);
   glAttachShader(program, fragment_shader);
-  log_debug("attached shaders");
   glLinkProgram(program);
-  log_debug("linked program");
+  GLCheckDbg("linking program");
 
   GLint status;
   glGetProgramiv(program, GL_LINK_STATUS, &status);
-  log_debug("got status &d", status);
   if (status != GL_TRUE) {
-    exit(1);
+    GLCheckDbg("Failed to create program with error: %d", status);
+    throw_gl_exception("Failed to create program with error: %d", status);
   }
-  log_debug("created program %d", program);
   return program;
 }
 
