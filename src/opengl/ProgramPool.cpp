@@ -106,8 +106,8 @@ GLuint create_program(GLuint vertex_shader, GLuint fragment_shader) {
   GLint status;
   glGetProgramiv(program, GL_LINK_STATUS, &status);
   if (status != GL_TRUE) {
-    GLCheckDbg("Failed to create program with error: %d", status);
-    throw_gl_exception("Failed to create program with error: %d", status);
+    GLCheckDbg("Failed to create program with link status: %d", status);
+    throw_gl_exception("Failed to create program with link status: %d", status);
   }
   return program;
 }

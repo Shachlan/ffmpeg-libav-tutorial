@@ -140,8 +140,10 @@ void invertFrame(uint32_t textureID) {
 void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
   auto program = get_blend_program();
   glUseProgram(program);
-  glUniform1f(glGetUniformLocation(program, "opacity"), blend_ratio);
-  glUniform1i(glGetUniformLocation(program, "blendMode"), 2);
+  glUniform1f(glGetUniformLocation(program, "opacity1"), 1);
+  glUniform1f(glGetUniformLocation(program, "opacity2"), blend_ratio);
+  glUniform1i(glGetUniformLocation(program, "numberOfLayers"), 2);
+  glUniform1i(glGetUniformLocation(program, "blendMode2"), 2);
   glUniform1i(glGetUniformLocation(program, "tex1"), texture1ID);
   glUniform1i(glGetUniformLocation(program, "tex2"), texture2ID);
   glDrawArrays(GL_TRIANGLES, 0, 6);
