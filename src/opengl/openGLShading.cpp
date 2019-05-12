@@ -123,7 +123,8 @@ void setupOpenGL(int width, int height, char *canvasName) {
   blend_program = build_blend_program();
 }
 
-void loadTexture(uint32_t textureID, int width, int height, uint8_t *buffer) {
+void loadTexture(uint32_t textureID, int width, int height, const uint8_t *buffer) {
+  glBindTexture(GL_TEXTURE_2D, textureID);
   glActiveTexture(GL_TEXTURE0 + textureID);
   glTexImage2D(GL_TEXTURE_2D, 0, PIXEL_FORMAT, width, height, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE,
                buffer);

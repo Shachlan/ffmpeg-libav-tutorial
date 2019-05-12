@@ -3,8 +3,8 @@ VIDEO_URL := http://distribution.bbb3d.renderfarming.net/video/mp4/bbb_sunflower
 transcoding: clean
 	mkdir -p ./build && \
 	cp ./src/opengl/shaders/* ./build/
-	g++ -g -Wall -std=c++14 ./src/all.hpp -o ./build/all.hpp.gch \
-	&& g++ -g -std=c++14 -Wall -o build/transcoding \
+	g++ -g -Wall -std=c++17 ./src/all.hpp -o ./build/all.hpp.gch \
+	&& g++ -g -std=c++17 -Wall -o build/transcoding \
 	-lboost_date_time -lavformat -lavcodec -lswscale -lz -lglfw -lavutil -framework OpenGL \
 	./src/*.cpp ./src/opengl/*.cpp ./src/transcoding/*.cpp \
 	 -I./src/ -I./src/opengl/ -I./src/transcoding/ -I ./build -include all.hpp -stdlib=libc++ -DGL_SILENCE_DEPRECATION=1 -DDEBUG=1 &&\

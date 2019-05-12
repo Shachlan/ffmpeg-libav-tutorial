@@ -1,3 +1,6 @@
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
+
 #include "opengl/GLException.hpp"
 
 #include <stdio.h>
@@ -36,7 +39,7 @@ static string error_descriptions(vector<GLenum> error_codes) {
 
 static GLException get_exception(string format, va_list argList) {
   GLException exception;
-  asprintf(&exception.full_description, format.c_str(), argList);
+  vasprintf(&exception.full_description, format.c_str(), argList);
   return exception;
 }
 

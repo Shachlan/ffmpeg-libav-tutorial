@@ -69,8 +69,9 @@
     "ctime": "cpp",
     "mutex": "cpp",
     "*.vsh": "glsl",
-    "*.fsh": "glsl"
-  },
+    "*.fsh": "glsl",
+    "shared_mutex": "cpp"
+},
 "git.ignoreLimitWarning": true,
 "glsllint.glslangValidatorPath": "/usr/local/Cellar/glslang/7.11.3188"
 }
