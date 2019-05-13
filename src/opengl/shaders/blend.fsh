@@ -1,9 +1,9 @@
 uniform sampler2D tex1;
-varying vec2 vTexCoord;
+varying vec2 vTexCoord1;
 uniform float opacity1;
 
 uniform sampler2D tex2;
-//varying vec2 vTexCoord;
+varying vec2 vTexCoord2;
 uniform float opacity2;
 uniform int blendMode2;
 
