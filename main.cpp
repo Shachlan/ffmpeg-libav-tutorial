@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
   uint32_t tex1 = createTexture();
   uint32_t tex2 = createTexture();
 
-  string name = "Apple SIMD";
+  string name = "OpenGL";
 
   int iterations = atoi(argv[5]);
   for (int k = 0; k < iterations; k++) {
