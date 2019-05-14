@@ -41,7 +41,10 @@
         "queue": "c",
         "random": "c",
         "variant": "c",
-        "regex": "cpp"
+        "regex": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp",
+        "vector": "cpp"
     },
     "git.ignoreLimitWarning": true
 }

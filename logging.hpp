@@ -30,10 +30,10 @@ using std::string;
 
 /// Log levels are enabled by default.
 #ifndef LOGGING_LEVEL_DEBUG
-#define LOGGING_LEVEL_DEBUG 1
+#define LOGGING_LEVEL_DEBUG 0
 #endif
 #ifndef LOGGING_LEVEL_INFO
-#define LOGGING_LEVEL_INFO 1
+#define LOGGING_LEVEL_INFO 0
 #endif
 #ifndef LOGGING_LEVEL_WARNING
 #define LOGGING_LEVEL_WARNING 1
