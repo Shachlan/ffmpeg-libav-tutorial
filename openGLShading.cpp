@@ -3,7 +3,7 @@
 #include <string>
 
 struct TextureInfo {
-  uint8_t *buffer;
+  const uint8_t *buffer;
   int width; 
   int height;
 };
@@ -27,7 +27,7 @@ void setupOpenGL(int width, int height, float blend_ratio, char *canvasName) {
   target_blend_ratio = blend_ratio;
 }
 
-void loadTexture(uint32_t textureID, int width, int height, uint8_t *buffer) {
+void loadTexture(uint32_t textureID, int width, int height, const uint8_t *buffer) {
   textures[textureID] = (TextureInfo) {
     .width = width,
     .height = height,

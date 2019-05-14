@@ -4,7 +4,7 @@ ARGS=./movies/small_bunny_1080p_60fps.mp4 ./movies/dog.mp4  ./movies/bunny_1s_go
 
 transcoding: ./*.cpp ./Transcoding/*.cpp
 	@g++ -g -w -std=c++17 all.hpp -o ./build/all.hpp.gch \
-	&& g++ -g -std=c++17 -w -o build/transcoding-apple-simd -lboost_date_time -lavformat -lavcodec -lswscale -lz -lglfw -lavutil -framework OpenGL *.cpp ./Transcoding/*.cpp -I./ -I ./build -include all.hpp \
+	&& g++ -g -std=c++17 -w -o build/transcoding-cpu -lboost_date_time -lavformat -lavcodec -lswscale -lz -lglfw -lavutil -framework OpenGL *.cpp ./Transcoding/*.cpp -I./ -I ./build -include all.hpp \
 
 clean:
 	@rm -rf ./build/*
