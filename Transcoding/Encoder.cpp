@@ -1,23 +1,24 @@
 // Copyright (c) 2019 Lightricks. All rights reserved.
 // Created by Shachar Langbeheim.
 
-#include "WREEncoder.hpp"
+#include "Transcoding/Encoder.hpp"
 
 extern "C" {
 #include <libavutil/avutil.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
-#include <libavutil/rational.h>
 #include <libswscale/swscale.h>
 #include "libavutil/imgutils.h"
 }
 
-#include "WRETranscodingComponents.hpp"
-#include "WREVideoFormatConverter.hpp"
+#include "Transcoding/AVRationalUtilities.hpp"
+#include "Transcoding/TranscodingComponents.hpp"
+#include "Transcoding/TranscodingException.hpp"
+#include "Transcoding/VideoFormatConverter.hpp"
 
-#pragma region initialization
+using namespace WRETranscoding;
 
-static int prepare_video_encoder(WRETranscodingComponents *encoder, AVFormatContext *format_context,
+static int prepare_video_encoder(TranscodingComponents *encoder, AVFormatContext *format_context,
                                  int width, int height, string codec_name,
                                  AVRational expected_framerate) {
   encoder->stream = avformat_new_stream(format_context, NULL);
@@ -67,11 +68,12 @@ static int prepare_video_encoder(WRETranscodingComponents *encoder, AVFormatCont
   return 0;
 }
 
-static int prepare_audio_encoder(WRETranscodingComponents *encoder, AVFormatContext *format_context,
-                                 WRETranscodingComponents *decoder) {
+static int prepare_audio_encoder(TranscodingComponents *encoder, AVFormatContext *format_context,
+                                 const TranscodingComponents *decoder) {
   encoder->stream = avformat_new_stream(format_context, NULL);
   encoder->codec = avcodec_find_encoder(decoder->codec->id);
   encoder->frame = decoder->frame;
+  encoder->shared_frame = true;
   encoder->packet = av_packet_alloc();
   avcodec_parameters_copy(encoder->stream->codecpar, decoder->stream->codecpar);
   if (!encoder->codec) {
@@ -106,25 +108,25 @@ static int prepare_audio_encoder(WRETranscodingComponents *encoder, AVFormatCont
   return 0;
 }
 
-WREEncoder::WREEncoder(string file_name, string video_codec_name, int video_width, int video_height,
-                       double video_framerate, WRETranscodingComponents *audio_decoder) {
+Encoder::Encoder(string file_name, string video_codec_name, int video_width, int video_height,
+                 double video_framerate, const TranscodingComponents *audio_decoder) {
   log_info("Opening encoder for %s", file_name.c_str());
-  video_encoder = new WRETranscodingComponents();
+  video_encoder = unique_ptr<TranscodingComponents>{new TranscodingComponents()};
 
   avformat_alloc_output_context2(&format_context, NULL, NULL, file_name.c_str());
   if (!format_context) {
-    throw "could not allocate memory for output format";
+    throw new TranscodingException("could not allocate memory for output format");
   }
 
-  if (prepare_video_encoder(video_encoder, format_context, video_width, video_height,
-                            video_codec_name, av_d2q(video_framerate, 300)) != 0) {
-    throw "error while preparing video encoder";
+  if (prepare_video_encoder(video_encoder.get(), format_context, video_width, video_height,
+                            video_codec_name, wre_double_to_rational(video_framerate)) != 0) {
+    throw new TranscodingException("error while preparing video encoder");
   }
 
   if (audio_decoder != nullptr) {
-    audio_encoder = new WRETranscodingComponents();
-    if (prepare_audio_encoder(audio_encoder, format_context, audio_decoder) != 0) {
-      throw "error while preparing audio copy";
+    audio_encoder = unique_ptr<TranscodingComponents>{new TranscodingComponents()};
+    if (prepare_audio_encoder(audio_encoder.get(), format_context, audio_decoder) != 0) {
+      throw new TranscodingException("error while preparing audio copy");
     }
   } else {
     audio_encoder = nullptr;
@@ -135,22 +137,19 @@ WREEncoder::WREEncoder(string file_name, string video_codec_name, int video_widt
 
   if (!(format_context->oformat->flags & AVFMT_NOFILE)) {
     if (avio_open(&format_context->pb, file_name.c_str(), AVIO_FLAG_WRITE) < 0) {
-      throw "could not open the output file";
+      throw new TranscodingException("could not open the output file");
     }
   }
   if (avformat_write_header(format_context, NULL) < 0) {
-    throw "an error occurred when opening output file";
+    throw new TranscodingException("an error occurred when opening output file");
   }
-  video_conversion_context =
-      WREVideoFormatConverter::create_encoding_conversion_context(video_encoder->context);
+  video_conversion_context = unique_ptr<VideoFormatConverter>{
+      VideoFormatConverter::create_encoding_conversion_context(video_encoder->context)};
 }
 
-#pragma endregion
-#pragma region encoding
-
-static int encode_frame(WRETranscodingComponents *encoder, AVFormatContext *format_context,
+static int encode_frame(TranscodingComponents *encoder, AVFormatContext *format_context,
                         AVRational source_time_base, AVFrame *frame) {
-  AVCodecContext *codec_context = encoder->context;
+  auto codec_context = encoder->context;
   encoder->latest_time_base = source_time_base;
 
   int ret;
@@ -178,50 +177,42 @@ static int encode_frame(WRETranscodingComponents *encoder, AVFormatContext *form
   return 0;
 }
 
-int WREEncoder::encode_video_frame(double source_time_base, long source_timestamp) {
+int Encoder::encode_video_frame(double source_time_base, long source_timestamp) {
   this->video_encoder->frame->pts = source_timestamp;
   this->video_conversion_context->convert_to_frame(this->video_encoder->frame);
-  return encode_frame(video_encoder, format_context, av_d2q(source_time_base, 300),
+  return encode_frame(video_encoder.get(), format_context, wre_double_to_rational(source_time_base),
                       video_encoder->frame);
 }
 
-int WREEncoder::encode_audio_frame(double source_time_base, long source_timestamp) {
+int Encoder::encode_audio_frame(double source_time_base, long source_timestamp) {
   this->audio_encoder->frame->pts = source_timestamp;
-  return encode_frame(audio_encoder, format_context, av_d2q(source_time_base, 300),
+  return encode_frame(audio_encoder.get(), format_context, wre_double_to_rational(source_time_base),
                       audio_encoder->frame);
 }
 
-int WREEncoder::finish_encoding() {
+int Encoder::finish_encoding() {
   log_info("finish encoding");
-  encode_frame(video_encoder, format_context, video_encoder->latest_time_base, NULL);
+  encode_frame(video_encoder.get(), format_context, video_encoder->latest_time_base, NULL);
   if (audio_encoder != nullptr) {
-    encode_frame(audio_encoder, format_context, audio_encoder->latest_time_base, NULL);
+    encode_frame(audio_encoder.get(), format_context, audio_encoder->latest_time_base, NULL);
   }
   av_write_trailer(format_context);
   return 0;
 }
 
-#pragma endregion
-#pragma region getters
-
-uint8_t *WREEncoder::get_rgb_buffer() {
-  return this->video_conversion_context->get_rgb_buffer();
+void Encoder::write_to_rgb_buffer(std::function<void(uint8_t *)> buffer_write) {
+  video_conversion_context->write_to_rgb_buffer(buffer_write);
 }
 
-int WREEncoder::get_width() {
+int Encoder::get_width() {
   return this->video_encoder->context->width;
 }
 
-int WREEncoder::get_height() {
+int Encoder::get_height() {
   return this->video_encoder->context->height;
 }
 
-WREEncoder::~WREEncoder() {
-  delete (video_encoder);
-  delete (audio_encoder);
-  delete (video_conversion_context);
+Encoder::~Encoder() {
   avformat_close_input(&format_context);
   avformat_free_context(format_context);
 }
-
-#pragma endregion

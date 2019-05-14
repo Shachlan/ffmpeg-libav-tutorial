@@ -1,6 +1,9 @@
-#include "WREVideoFormatConverter.hpp"
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
 
-#pragma region resources - allocation
+#include "Transcoding/VideoFormatConverter.hpp"
+
+using namespace WRETranscoding;
 
 static struct SwsContext *conversion_context_from_codec_to_rgb(AVCodecContext *codec) {
   int height = codec->height;
@@ -36,52 +39,50 @@ uint8_t **rgb_buffer_for_codec(AVCodecContext *codec) {
   return rgb_buffer_for_size(codec->width, codec->height);
 }
 
-#pragma endregion
-#pragma region constructors destructors
-
-WREVideoFormatConverter *WREVideoFormatConverter::create_encoding_conversion_context(
+VideoFormatConverter *VideoFormatConverter::create_encoding_conversion_context(
     AVCodecContext *codec) {
-  auto context = new WREVideoFormatConverter();
+  auto context = new VideoFormatConverter();
   context->conversion_context = conversion_context_from_rgb_to_codec(codec);
   context->linesize = linesize_for_codec(codec);
   context->rgb_buffer = rgb_buffer_for_codec(codec);
   return context;
 }
 
-WREVideoFormatConverter *WREVideoFormatConverter::create_decoding_conversion_context(
+VideoFormatConverter *VideoFormatConverter::create_decoding_conversion_context(
     AVCodecContext *codec) {
-  auto context = new WREVideoFormatConverter();
+  auto context = new VideoFormatConverter();
   context->conversion_context = conversion_context_from_codec_to_rgb(codec);
   context->linesize = linesize_for_codec(codec);
   context->rgb_buffer = rgb_buffer_for_codec(codec);
   return context;
 }
 
-WREVideoFormatConverter::~WREVideoFormatConverter() {
+VideoFormatConverter::~VideoFormatConverter() {
   free(this->rgb_buffer[0]);
   free(this->rgb_buffer);
   free(this->linesize);
   sws_freeContext(this->conversion_context);
 }
 
-#pragma endregion
-#pragma region conversions
-
-int WREVideoFormatConverter::convert_from_frame(AVFrame *frame) {
-  return sws_scale(this->conversion_context, (const uint8_t *const *)frame->data, frame->linesize,
-                   0, frame->height, this->rgb_buffer, this->linesize);
+void VideoFormatConverter::convert_from_frame(AVFrame *frame) {
+  std::unique_lock lock(mutex);
+  sws_scale(this->conversion_context, (const uint8_t *const *)frame->data, frame->linesize, 0,
+            frame->height, this->rgb_buffer, this->linesize);
 }
 
-int WREVideoFormatConverter::convert_to_frame(AVFrame *frame) {
-  return sws_scale(this->conversion_context, (const uint8_t *const *)this->rgb_buffer,
-                   this->linesize, 0, frame->height, frame->data, frame->linesize);
+void VideoFormatConverter::convert_to_frame(AVFrame *frame) {
+  std::shared_lock lock(mutex);
+  sws_scale(this->conversion_context, (const uint8_t *const *)this->rgb_buffer, this->linesize, 0,
+            frame->height, frame->data, frame->linesize);
 }
 
-#pragma endregion
-#pragma region getters
-
-uint8_t *WREVideoFormatConverter::get_rgb_buffer() {
-  return this->rgb_buffer[0];
+void VideoFormatConverter::read_from_rgb_buffer(
+    std::function<void(const uint8_t *)> buffer_read) const {
+  std::shared_lock lock(mutex);
+  buffer_read(rgb_buffer[0]);
 }
 
-#pragma endregion
+void VideoFormatConverter::write_to_rgb_buffer(std::function<void(uint8_t *)> buffer_write) {
+  std::unique_lock lock(mutex);
+  buffer_write(rgb_buffer[0]);
+}

@@ -15,7 +15,7 @@ extern void tearDownOpenGL(void);
 #if FRONTEND == 0
 extern uint32_t createTexture(void);
 extern void getCurrentResults(int width, int height, uint8_t *outputBuffer);
-extern void loadTexture(uint32_t textureID, int width, int height, uint8_t *buffer);
+extern void loadTexture(uint32_t textureID, int width, int height, const uint8_t *buffer);
 #endif
 
 #ifdef __cplusplus

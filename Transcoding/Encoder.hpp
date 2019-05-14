@@ -1,29 +1,35 @@
 // Copyright (c) 2019 Lightricks. All rights reserved.
 // Created by Shachar Langbeheim.
 
-struct WRETranscodingComponents;
-struct AVFormatContext;
-struct WREVideoFormatConverter;
+#include <functional>
 
-/// Struct that cleanly wraps audio and video encoding. Video encoding is handled by populating the
-/// RGB data buffer returned from \c get_rgb_buffer, while audio encoding is handled directly from
-/// the decoder (see note below).
+struct AVFormatContext;
+
+namespace WRETranscoding {
+
+struct TranscodingComponents;
+struct VideoFormatConverter;
+
+/// Struct that cleanly wraps audio and video encoding. Video encoding is handled by populating an
+/// internal RGB data buffer by using \c write_to_rgb_buffer, while audio encoding is handled
+/// directly from the decoder (see note below).
 ///
 /// @important ATM audio encoding is strictly passthrough from a single source, so that the audio
 /// source components are passed during construction in order to copy all audio parameters and share
 /// all data buffers.
-class WREEncoder {
+class Encoder {
 public:
   /// Opens the file at \c file_name for audio-video encoding. The video will be encoded using \c
   /// video_codec_name codec, with resolution of \c video_width x \c video_height, with \c
   /// video_framerate. \c audio_decoder will be used to initialize the internal audio decoder.
-  WREEncoder(string file_name, string video_codec_name, int video_width, int video_height,
-             double video_framerate, WRETranscodingComponents *audio_decoder);
-  ~WREEncoder();
+  Encoder(string file_name, string video_codec_name, int video_width, int video_height,
+          double video_framerate, const TranscodingComponents *audio_decoder);
+  ~Encoder();
 
-  /// Returns a data buffer sized 3 * width * height. This data should be populated with RGB pixel
-  /// information before calls to \c encode_video_frame.
-  uint8_t *get_rgb_buffer();
+  /// Calls the given \c buffer_write function over the internal RGB buffer, sized  3 * width *
+  /// height. This will allow the function to access the buffer data and modify it. This data should
+  /// be populated with RGB pixel information before calls to \c encode_video_frame.
+  void write_to_rgb_buffer(std::function<void(uint8_t *)> buffer_write);
 
   /// Encodes the information in the internal data buffer as a video frame timestamped as
   /// source_timestamp * source_time_base. Returns 0 if encoding succeeded.
@@ -43,8 +49,17 @@ public:
   int get_height();
 
 private:
-  WRETranscodingComponents *video_encoder;
-  WRETranscodingComponents *audio_encoder;
+  /// Encoder for video frames.
+  unique_ptr<TranscodingComponents> video_encoder;
+
+  /// Encoder for audio frames.
+  unique_ptr<TranscodingComponents> audio_encoder;
+
+  /// Wrapper for the encoded file.
   AVFormatContext *format_context;
-  WREVideoFormatConverter *video_conversion_context;
+
+  /// Context for converting RGB frames into the format used by \c video_encoder.
+  unique_ptr<VideoFormatConverter> video_conversion_context;
 };
+
+}  // namespace WRETranscoding
