@@ -66,8 +66,7 @@ static GLuint build_shader(const GLchar *shader_source, GLenum shader_type) {
   glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logSize);
   GLchar *errorLog = (GLchar *)calloc(logSize, sizeof(GLchar));
   glGetShaderInfoLog(shader, logSize, 0, errorLog);
-  log_error("%s", errorLog);
-  free(errorLog);
+  throw_gl_exception("Failed to build shader with error:\n%s", errorLog);
   return 0;
 }
 
@@ -84,10 +83,6 @@ static string get_shader_text(string shader_file_name) {
 int build_shader(string shader_file_name, GLenum shader_type) {
   auto text = get_shader_text(shader_file_name);
   auto shader_name = build_shader(text.c_str(), shader_type);
-  if (shader_name == 0) {
-    GLCheckDbg("Failed to build shader");
-    throw_gl_exception("Failed to build shader");
-  }
 
   return shader_name;
 }
@@ -106,8 +101,12 @@ GLuint create_program(GLuint vertex_shader, GLuint fragment_shader) {
   GLint status;
   glGetProgramiv(program, GL_LINK_STATUS, &status);
   if (status != GL_TRUE) {
-    GLCheckDbg("Failed to create program with link status: %d", status);
-    throw_gl_exception("Failed to create program with link status: %d", status);
+    GLint maxLength = 0;
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
+
+    GLchar infoLog[maxLength];
+    glGetProgramInfoLog(program, maxLength, &maxLength, &infoLog[0]);
+    throw_gl_exception("Failed to create program with error:\n%s", infoLog);
   }
   return program;
 }
