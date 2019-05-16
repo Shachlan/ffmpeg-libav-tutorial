@@ -31,7 +31,7 @@ static TexturePool texture_pool;
 
 typedef struct {
   GLuint position_buffer;
-  GLuint texture_buffer;
+  GLuint *texture_buffers;
 } ProgramInfo;
 
 ProgramInfo invert_program;
@@ -54,7 +54,7 @@ static GLuint position_buffer_setup(GLuint program) {
   GLuint positionBuf;
   glGenBuffers(1, &positionBuf);
   glBindBuffer(GL_ARRAY_BUFFER, positionBuf);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(position), position, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(position), position, GL_DYNAMIC_DRAW);
 
   GLint loc = glGetAttribLocation(program, "position");
   glEnableVertexAttribArray(loc);
@@ -62,17 +62,22 @@ static GLuint position_buffer_setup(GLuint program) {
   return positionBuf;
 }
 
-static GLuint texture_buffer_setup(GLuint program, char *buffer_name) {
-  GLuint texturesBuffer;
-  glGenBuffers(1, &texturesBuffer);
-  glBindBuffer(GL_ARRAY_BUFFER, texturesBuffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(textureCoords), textureCoords, GL_STATIC_DRAW);
+static void setup_texture_buffer(GLuint program, GLuint buffer, string buffer_name) {
+  glBindBuffer(GL_ARRAY_BUFFER, buffer);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(textureCoords), textureCoords, GL_DYNAMIC_DRAW);
   GLCheckDbg("buffering data.");
 
-  GLint loc = glGetAttribLocation(program, buffer_name);
+  GLint loc = glGetAttribLocation(program, buffer_name.c_str());
   glEnableVertexAttribArray(loc);
   glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
   GLCheckDbg("Attribute pointer.");
+}
+
+static GLuint texture_buffer_setup(GLuint program, string buffer_name) {
+  GLuint texturesBuffer;
+  glGenBuffers(1, &texturesBuffer);
+  setup_texture_buffer(program, texturesBuffer, buffer_name);
+
   return texturesBuffer;
 }
 
@@ -86,7 +91,9 @@ ProgramInfo build_invert_program() {
   GLuint position_buffer = position_buffer_setup(program);
   GLuint texture_buffer = texture_buffer_setup(program, "texCoord");
 
-  return (ProgramInfo){position_buffer, texture_buffer};
+  auto array = (GLuint *)calloc(1, sizeof(GLuint));
+  array[0] = texture_buffer;
+  return (ProgramInfo){position_buffer, array};
 }
 
 GLuint get_blend_program() {
@@ -102,8 +109,12 @@ ProgramInfo build_blend_program() {
   GLCheckDbg("Setting up position buffer.");
 
   GLuint texture_buffer = texture_buffer_setup(program, "texCoord1");
-  GLuint texture_buffer = texture_buffer_setup(program, "texCoord2");
-  return (ProgramInfo){position_buffer, texture_buffer};
+  auto array = (GLuint *)calloc(2, sizeof(GLuint));
+  array[0] = texture_buffer;
+  texture_buffer = texture_buffer_setup(program, "texCoord2");
+  array[1] = texture_buffer;
+
+  return (ProgramInfo){position_buffer, array};
 }
 
 void setupOpenGL(int width, int height, char *canvasName) {
@@ -146,18 +157,21 @@ void loadTexture(uint32_t textureID, int width, int height, const uint8_t *buffe
 void invertFrame(uint32_t textureID) {
   auto program = get_invert_program();
   glUseProgram(program);
+
   glUniform1i(glGetUniformLocation(program, "tex"), textureID);
 
-  glBindBuffer(GL_ARRAY_BUFFER, invert_program.texture_buffer);
-  GLint loc = glGetAttribLocation(program, "texCoord");
-  glEnableVertexAttribArray(loc);
-  glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+  setup_texture_buffer(program, invert_program.texture_buffers[0], "texCoord");
+
   glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
 void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
   auto program = get_blend_program();
   glUseProgram(program);
+
+  setup_texture_buffer(program, blend_program.texture_buffers[0], "texCoord1");
+  setup_texture_buffer(program, blend_program.texture_buffers[1], "texCoord2");
+
   glUniform1f(glGetUniformLocation(program, "opacity1"), 1);
   glUniform1f(glGetUniformLocation(program, "opacity2"), blend_ratio);
   glUniform1i(glGetUniformLocation(program, "numberOfLayers"), 2);
@@ -175,9 +189,10 @@ void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
 
 void tearDownOpenGL() {
   glDeleteBuffers(1, &invert_program.position_buffer);
-  glDeleteBuffers(1, &invert_program.texture_buffer);
+  glDeleteBuffers(1, &invert_program.texture_buffers[0]);
   glDeleteBuffers(1, &blend_program.position_buffer);
-  glDeleteBuffers(1, &blend_program.texture_buffer);
+  glDeleteBuffers(1, &blend_program.texture_buffers[0]);
+  glDeleteBuffers(1, &blend_program.texture_buffers[1]);
   log_debug("releasing programs");
   program_pool.clear();
 #if FRONTEND == 0

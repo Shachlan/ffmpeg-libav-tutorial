@@ -76,28 +76,12 @@ int main(int argc, char *argv[]) {
   long blended_frames = 0;
   long inverted_frames = 0;
   long audio_frames = 0;
-  while (decoder->decode_next_frame() >= 0) {
+  while (decoder->decode_next_frame() >= 0 && secondary_decoder->decode_next_frame()) {
     counted_frames++;
-
-    auto point_in_time = source_time_base * decoder->get_current_timestamp();
-    // logging("point in time %f", point_in_time);
-    if (point_in_time < wait || point_in_time > maxTime) {
-      inverted_frames++;
-      invert_single_frame(decoder, encoder, tex1);
-      encoder->encode_video_frame(source_time_base, decoder->get_current_timestamp());
-      // av_frame_unref(inputFrame);
-      continue;
-    }
-
-    response = secondary_decoder->decode_next_frame();
-    if (response < 0) {
-      log_error("DECODER: Error while receiving a frame from the secondary decoder: %d", response);
-      return response;
-    }
-
-    blended_frames++;
     blend_frames(decoder, secondary_decoder, encoder, tex1, tex2,
-                 (float)decoder->get_current_timestamp() * decoder->get_time_base() / 5);
+                  (float)decoder->get_current_timestamp() * decoder->get_time_base() / 5);
+    // invert_single_frame(decoder, encoder, tex1);
+
     encoder->encode_video_frame(source_time_base, decoder->get_current_timestamp());
   }
 
