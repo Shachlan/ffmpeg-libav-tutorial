@@ -9,7 +9,7 @@ transcoding: clean
 	./src/*.cpp ./src/opengl/*.cpp ./src/transcoding/*.cpp \
 	 -I./src/ -I./src/opengl/ -I./src/transcoding/ -I ./build2 -include all.hpp -stdlib=libc++ -DGL_SILENCE_DEPRECATION=1 -DDEBUG=1 &&\
 	 cd ./build2 &&\
-	 ./transcoding ./../movies/small_bunny_1080p_60fps.mp4 ./../movies/dog.mp4  ./../movies/bunny_1s_gop.mp4 0.5 1 4
+	 ./transcoding ./../movies/small_bunny_1080p_60fps.mp4 ./../movies/dog.mp4  ./../movies/bunny_2s_gop.mp4 0.5 2 4
 
 clean:
 	rm -rf ./build2/*

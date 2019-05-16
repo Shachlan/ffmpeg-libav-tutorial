@@ -59,8 +59,6 @@ int main(int argc, char *argv[]) {
                                        audio_decoder->get_transcoding_components());
 
   log_info("next");
-  float blendRatio = strtof(argv[4], NULL);
-  printf("blend ratio: %f\n", blendRatio);
   int wait = atoi(argv[5]);
   int length = atoi(argv[6]);
 

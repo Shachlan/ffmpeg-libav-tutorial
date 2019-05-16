@@ -29,7 +29,7 @@ static string error_description(GLenum error_code) {
 }
 
 static string error_descriptions(vector<GLenum> error_codes) {
-  string error_descriptions = "Errors: ";
+  string error_descriptions = " Errors: ";
   for (auto &error_code : error_codes) {
     error_descriptions += error_description(error_code) + ",";
   }

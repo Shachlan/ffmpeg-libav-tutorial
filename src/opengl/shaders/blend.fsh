@@ -155,10 +155,10 @@ vec4 blend(vec4 color, int blendMode, vec4 front, float opacity) {
 }
 
 void main() {
-  vec4 color = texture2D(tex1, vTexCoord) * opacity1;
+  vec4 color = texture2D(tex1, vTexCoord1) * opacity1;
 
   if (numberOfLayers >= 2) {
-    color = blend(color, blendMode2, texture2D(tex2, vTexCoord), opacity2);
+    color = blend(color, blendMode2, texture2D(tex2, vTexCoord2), opacity2);
   }
 
   // if (numberOfLayers >= 3) {

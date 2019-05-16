@@ -22,6 +22,7 @@
 
 #include "ProgramPool.hpp"
 #include "TexturePool.hpp"
+#include "GLException.hpp"
 
 using namespace WREOpenGL;
 
@@ -61,15 +62,17 @@ static GLuint position_buffer_setup(GLuint program) {
   return positionBuf;
 }
 
-static GLuint texture_buffer_setup(GLuint program) {
+static GLuint texture_buffer_setup(GLuint program, char *buffer_name) {
   GLuint texturesBuffer;
   glGenBuffers(1, &texturesBuffer);
   glBindBuffer(GL_ARRAY_BUFFER, texturesBuffer);
   glBufferData(GL_ARRAY_BUFFER, sizeof(textureCoords), textureCoords, GL_STATIC_DRAW);
+  GLCheckDbg("buffering data.");
 
-  GLint loc = glGetAttribLocation(program, "texCoord");
+  GLint loc = glGetAttribLocation(program, buffer_name);
   glEnableVertexAttribArray(loc);
   glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+  GLCheckDbg("Attribute pointer.");
   return texturesBuffer;
 }
 
@@ -81,19 +84,25 @@ ProgramInfo build_invert_program() {
   GLuint program = get_invert_program();
   glUseProgram(program);
   GLuint position_buffer = position_buffer_setup(program);
-  GLuint texture_buffer = texture_buffer_setup(program);
+  GLuint texture_buffer = texture_buffer_setup(program, "texCoord");
+
   return (ProgramInfo){position_buffer, texture_buffer};
 }
 
 GLuint get_blend_program() {
-  return program_pool.get_program("passthrough", "blend");
+  return program_pool.get_program("blend", "blend");
 }
 
 ProgramInfo build_blend_program() {
   GLuint program = get_blend_program();
   glUseProgram(program);
+
+  GLCheckDbg("Use blend.");
   GLuint position_buffer = position_buffer_setup(program);
-  GLuint texture_buffer = texture_buffer_setup(program);
+  GLCheckDbg("Setting up position buffer.");
+
+  GLuint texture_buffer = texture_buffer_setup(program, "texCoord1");
+  GLuint texture_buffer = texture_buffer_setup(program, "texCoord2");
   return (ProgramInfo){position_buffer, texture_buffer};
 }
 
@@ -118,9 +127,13 @@ void setupOpenGL(int width, int height, char *canvasName) {
   glfwMakeContextCurrent(window);
 
 #endif
+  GLCheckDbg("setting up context.");
   glViewport(0, 0, width, height);
+  GLCheckDbg("creating viewport.");
   invert_program = build_invert_program();
+  GLCheckDbg("Creating invert.");
   blend_program = build_blend_program();
+  GLCheckDbg("Creating blend.");
 }
 
 void loadTexture(uint32_t textureID, int width, int height, const uint8_t *buffer) {
@@ -134,6 +147,11 @@ void invertFrame(uint32_t textureID) {
   auto program = get_invert_program();
   glUseProgram(program);
   glUniform1i(glGetUniformLocation(program, "tex"), textureID);
+
+  glBindBuffer(GL_ARRAY_BUFFER, invert_program.texture_buffer);
+  GLint loc = glGetAttribLocation(program, "texCoord");
+  glEnableVertexAttribArray(loc);
+  glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
   glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
@@ -146,7 +164,9 @@ void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
   glUniform1i(glGetUniformLocation(program, "blendMode2"), 2);
   glUniform1i(glGetUniformLocation(program, "tex1"), texture1ID);
   glUniform1i(glGetUniformLocation(program, "tex2"), texture2ID);
+  GLCheckDbg("Setting up draw.");
   glDrawArrays(GL_TRIANGLES, 0, 6);
+  GLCheckDbg("Draw.");
 }
 
 void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
