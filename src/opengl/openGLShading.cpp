@@ -71,14 +71,13 @@ uint32_t get_texture() {
 }
 
 static GLuint generate_vertex_array() {
-  // GLuint vao;
-  // GLCheckDbg("reality check.");
-  // glGenVertexArrays(1, &vao);
-  // GLCheckDbg("generating vertex array.");
-  // glBindVertexArray(vao);
-  // GLCheckDbg("binding vertex array.");
-  // return vao;
-  return 0;
+  GLuint vao;
+  GLCheckDbg("reality check.");
+  glGenVertexArrays(1, &vao);
+  GLCheckDbg("generating vertex array.");
+  glBindVertexArray(vao);
+  GLCheckDbg("binding vertex array.");
+  return vao;
 }
 
 static GLuint position_buffer_setup(GLuint program) {
@@ -92,7 +91,9 @@ static GLuint position_buffer_setup(GLuint program) {
 
   GLint loc = glGetAttribLocation(program, "position");
   glEnableVertexAttribArray(loc);
+  GLCheckDbg("enable position vertex attribute array.");
   glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+  GLCheckDbg("setting position vertex attribute pointer.");
   return positionBuf;
 }
 
@@ -107,8 +108,9 @@ static GLuint texture_buffer_setup(GLuint program, string buffer_name) {
 
   GLint loc = glGetAttribLocation(program, buffer_name.c_str());
   glEnableVertexAttribArray(loc);
+  GLCheckDbg("enable texture vertex attribute array.");
   glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
-  GLCheckDbg("Attribute pointer.");
+  GLCheckDbg("setting texture vertex attribute pointer.");
   return texturesBuffer;
 }
 
@@ -178,13 +180,22 @@ void setupOpenGL(int width, int height, char *canvasName) {
 
 #else
 
-  glfwInit();
+  if (!glfwInit()) {
+    log_error("init failed");
+    exit(1);
+  }
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   log_info("glfw init");
   glfwWindowHint(GLFW_VISIBLE, 0);
-  // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
   log_info("creating window");
   window = glfwCreateWindow(width, height, "", NULL, NULL);
+  if (window == NULL) {
+    log_error("no window");
+    exit(1);
+  }
   log_info("created window");
   glfwMakeContextCurrent(window);
   log_info("made context current");
@@ -207,28 +218,28 @@ void setupOpenGL(int width, int height, char *canvasName) {
   passthrough_program = build_passthrough_program();
 
 
-  // context = GrContext::MakeGL();
-  // backend_texture = get_texture();
-  // glBindTexture(GL_TEXTURE_2D, backend_texture);
-  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-  //              nullptr);
-  // GrGLTextureInfo texture_info = {
-  //   .fID = backend_texture,
-  //   .fTarget = GL_TEXTURE_2D,
-  //   .fFormat = GR_GL_RGBA8
-  // };
-  // GrBackendTexture texture(width, height, GrMipMapped::kNo, texture_info);
-  // surface = sk_sp(SkSurface::MakeFromBackendTexture(context.get(), texture, kTopLeft_GrSurfaceOrigin, 0,
-  //           kRGBA_8888_SkColorType, nullptr, nullptr));
-  // if (!surface) {
-  //   log_error("SkSurface::MakeRenderTarget returned null");
-  //   exit(1);
-  // }
-  // canvas = surface->getCanvas();
-  // if (canvas == nullptr) {
-  //   log_error("no canvas");
-  //   exit(1);
-  // }
+  context = GrContext::MakeGL();
+  backend_texture = get_texture();
+  glBindTexture(GL_TEXTURE_2D, backend_texture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               nullptr);
+  GrGLTextureInfo texture_info = {
+    .fID = backend_texture,
+    .fTarget = GL_TEXTURE_2D,
+    .fFormat = GR_GL_RGBA8
+  };
+  GrBackendTexture texture(width, height, GrMipMapped::kNo, texture_info);
+  surface = sk_sp(SkSurface::MakeFromBackendTexture(context.get(), texture, kTopLeft_GrSurfaceOrigin, 0,
+            kRGBA_8888_SkColorType, nullptr, nullptr));
+  if (!surface) {
+    log_error("SkSurface::MakeRenderTarget returned null");
+    exit(1);
+  }
+  canvas = surface->getCanvas();
+  if (canvas == nullptr) {
+    log_error("no canvas");
+    exit(1);
+  }
 }
 
 void loadTexture(uint32_t textureID, int width, int height, const uint8_t *buffer) {
@@ -270,9 +281,6 @@ void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
 }
 
 void render_text(string text) {
-  GLCheckDbg("push");
-  //glPushAttrib(GL_ALL_ATTRIB_BITS);
-  GLCheckDbg("push");
   auto text_color = SkColor4f::FromColor(SkColorSetARGB(255, 0, 0, 255));
   SkPaint paint2(text_color);
   auto text_blob = SkTextBlob::MakeFromString(text.c_str(), SkFont(nullptr, 22));
@@ -290,11 +298,6 @@ void render_text(string text) {
   }
 
   GLCheckDbg("Skia");
-  
-  //glPopClientAttrib();
-  //glPopAttrib();
-
-  GLCheckDbg("pop");
 
   GLint fbo;
   glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbo);

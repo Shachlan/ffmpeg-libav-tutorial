@@ -66,7 +66,7 @@ static vector<GLenum> get_openGL_errors() {
 void check_gl_errors(string format, ...) {
   auto errors = get_openGL_errors();
   if (errors.size() == 0) {
-    //log_info("%s passed", format.c_str());
+    log_info("%s passed", format.c_str());
     return;
   }
 
