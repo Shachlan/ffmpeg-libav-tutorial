@@ -10,6 +10,8 @@ extern "C" {
 #include <libavutil/log.h>
 }
 
+#include <OpenGL/gl3.h>
+
 #define FRONTEND 0;
 
 static void invert_single_frame(WREVideoDecoder *decoder, WREEncoder *encoder, uint32_t textureID) {
@@ -29,10 +31,11 @@ static void blend_frames(WREVideoDecoder *decoder, WREVideoDecoder *secondary_de
 }
 
 int main(int argc, char *argv[]) {
+  try {
   av_log_set_level(AV_LOG_FATAL);
   log_debug("start");
-  int height = 1080;
-  int width = 1920;
+  int height = 200;
+  int width = 300;
   auto expected_framerate = 30;
 
   auto decoder = new WREVideoDecoder(argv[1], expected_framerate, 1, 5, 2);
@@ -76,28 +79,15 @@ int main(int argc, char *argv[]) {
   long blended_frames = 0;
   long inverted_frames = 0;
   long audio_frames = 0;
+
   while (decoder->decode_next_frame() >= 0) {
     counted_frames++;
-
-    auto point_in_time = source_time_base * decoder->get_current_timestamp();
-    // logging("point in time %f", point_in_time);
-    if (point_in_time < wait || point_in_time > maxTime) {
-      inverted_frames++;
-      invert_single_frame(decoder, encoder, tex1);
-      encoder->encode_video_frame(source_time_base, decoder->get_current_timestamp());
-      // av_frame_unref(inputFrame);
-      continue;
-    }
-
-    response = secondary_decoder->decode_next_frame();
-    if (response < 0) {
-      log_error("DECODER: Error while receiving a frame from the secondary decoder: %d", response);
-      return response;
-    }
-
-    blended_frames++;
-    blend_frames(decoder, secondary_decoder, encoder, tex1, tex2,
-                 (float)decoder->get_current_timestamp() * decoder->get_time_base() / 5);
+    glClearColor(0,0,0,0);
+    glClear(GL_COLOR_BUFFER_BIT);
+    loadTexture(tex1, decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
+    invertFrame(tex1);
+    // render_text("Inverting " + std::to_string(decoder->get_current_timestamp()));
+    getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
     encoder->encode_video_frame(source_time_base, decoder->get_current_timestamp());
   }
 
@@ -126,5 +116,8 @@ int main(int argc, char *argv[]) {
   log_debug("releasing encoder");
   tearDownOpenGL();
   log_debug("teardown opengl");
+  } catch (std::exception &exception) {
+    log_error("%s", exception.what());
+  }
   return 0;
 }

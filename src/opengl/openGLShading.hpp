@@ -8,6 +8,8 @@ void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio);
 
 void tearDownOpenGL();
 
+void render_text(string text);
+
 #if FRONTEND == 0
 uint32_t get_texture();
 void getCurrentResults(int width, int height, uint8_t *outputBuffer);

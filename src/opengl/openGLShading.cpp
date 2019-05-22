@@ -24,21 +24,41 @@
 #include "ProgramPool.hpp"
 #include "TexturePool.hpp"
 
+#include "GrContext.h"
+#include "SkData.h"
+#include "SkFont.h"
+#include "SkImage.h"
+#include "SkPaint.h"
+#include "SkStream.h"
+#include "SkSurface.h"
+#include "SkTextBlob.h"
+#include "gl/GrGLInterface.h"
+#include <sstream>
+#include <src/gpu/gl/GrGlDefines.h>
+
 using namespace WREOpenGL;
 
 static ProgramPool program_pool;
 static TexturePool texture_pool;
 
+static SkCanvas *canvas;
+static sk_sp<GrContext> context;
+static sk_sp<SkSurface> surface;
+
 typedef struct {
   GLuint position_buffer;
   GLuint texture_buffer;
+  GLuint vertex_array;
 } ProgramInfo;
 
 ProgramInfo invert_program;
 ProgramInfo blend_program;
+ProgramInfo passthrough_program;
 #if FRONTEND == 0
 GLFWwindow *window;
 #endif
+GLuint backend_texture;
+GLuint vertex_array;
 
 static const float position[12] = {-1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f,
                                    -1.0f, 1.0f,  1.0f, -1.0f, 1.0f,  1.0f};
@@ -50,11 +70,25 @@ uint32_t get_texture() {
   return texture_pool.get_texture();
 }
 
+static GLuint generate_vertex_array() {
+  // GLuint vao;
+  // GLCheckDbg("reality check.");
+  // glGenVertexArrays(1, &vao);
+  // GLCheckDbg("generating vertex array.");
+  // glBindVertexArray(vao);
+  // GLCheckDbg("binding vertex array.");
+  // return vao;
+  return 0;
+}
+
 static GLuint position_buffer_setup(GLuint program) {
   GLuint positionBuf;
   glGenBuffers(1, &positionBuf);
+  GLCheckDbg("generating position buffer.");
   glBindBuffer(GL_ARRAY_BUFFER, positionBuf);
+  GLCheckDbg("binding position buffer.");
   glBufferData(GL_ARRAY_BUFFER, sizeof(position), position, GL_STATIC_DRAW);
+  GLCheckDbg("buffering position data.");
 
   GLint loc = glGetAttribLocation(program, "position");
   glEnableVertexAttribArray(loc);
@@ -62,14 +96,16 @@ static GLuint position_buffer_setup(GLuint program) {
   return positionBuf;
 }
 
-static GLuint texture_buffer_setup(GLuint program, char *buffer_name) {
+static GLuint texture_buffer_setup(GLuint program, string buffer_name) {
   GLuint texturesBuffer;
   glGenBuffers(1, &texturesBuffer);
+  GLCheckDbg("generating texture buffer.");
   glBindBuffer(GL_ARRAY_BUFFER, texturesBuffer);
+  GLCheckDbg("binding texture buffer.");
   glBufferData(GL_ARRAY_BUFFER, sizeof(textureCoords), textureCoords, GL_STATIC_DRAW);
-  GLCheckDbg("buffering data.");
+  GLCheckDbg("buffering texture data.");
 
-  GLint loc = glGetAttribLocation(program, buffer_name);
+  GLint loc = glGetAttribLocation(program, buffer_name.c_str());
   glEnableVertexAttribArray(loc);
   glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
   GLCheckDbg("Attribute pointer.");
@@ -82,11 +118,31 @@ GLuint get_invert_program() {
 
 ProgramInfo build_invert_program() {
   GLuint program = get_invert_program();
+  GLCheckDbg("generating program.");
   glUseProgram(program);
+  GLCheckDbg("use invert program.");
+  auto vertex_array = generate_vertex_array();
   GLuint position_buffer = position_buffer_setup(program);
   GLuint texture_buffer = texture_buffer_setup(program, "texCoord");
 
-  return (ProgramInfo){position_buffer, texture_buffer};
+  return (ProgramInfo){position_buffer, texture_buffer, vertex_array};
+}
+
+GLuint get_passthrough_program() {
+  return program_pool.get_program("passthrough", "passthrough");
+}
+
+ProgramInfo build_passthrough_program() {
+  GLuint program = get_passthrough_program();
+  GLCheckDbg("generating program.");
+  glUseProgram(program);
+  GLCheckDbg("use passthrough program.");
+  auto vertex_array = generate_vertex_array();
+  GLuint position_buffer = position_buffer_setup(program);
+  GLuint texture_buffer = texture_buffer_setup(program, "texCoord");
+
+
+  return (ProgramInfo){position_buffer, texture_buffer, vertex_array};
 }
 
 GLuint get_blend_program() {
@@ -95,14 +151,16 @@ GLuint get_blend_program() {
 
 ProgramInfo build_blend_program() {
   GLuint program = get_blend_program();
+  GLCheckDbg("generating program.");
   glUseProgram(program);
+  GLCheckDbg("use blending program.");
 
-  GLCheckDbg("Use blend.");
+  auto vertex_array = generate_vertex_array();
   GLuint position_buffer = position_buffer_setup(program);
   GLCheckDbg("Setting up position buffer.");
-
+  
   GLuint texture_buffer = texture_buffer_setup(program, "texCoord");
-  return (ProgramInfo){position_buffer, texture_buffer};
+  return (ProgramInfo){position_buffer, texture_buffer, vertex_array};
 }
 
 void setupOpenGL(int width, int height, char *canvasName) {
@@ -121,9 +179,22 @@ void setupOpenGL(int width, int height, char *canvasName) {
 #else
 
   glfwInit();
+  log_info("glfw init");
   glfwWindowHint(GLFW_VISIBLE, 0);
+  // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+  log_info("creating window");
   window = glfwCreateWindow(width, height, "", NULL, NULL);
+  log_info("created window");
   glfwMakeContextCurrent(window);
+  log_info("made context current");
+
+  log_info("mdouble check");
+  auto version = glGetString(GL_VERSION);
+  GLCheckDbg("get version.");
+  auto glsl_version = glGetString(GL_SHADING_LANGUAGE_VERSION);
+  GLCheckDbg("get glsl version.");
+  log_info("version: %s, glsl: %s", version, glsl_version);
 
 #endif
   GLCheckDbg("setting up context.");
@@ -133,6 +204,31 @@ void setupOpenGL(int width, int height, char *canvasName) {
   GLCheckDbg("Creating invert.");
   blend_program = build_blend_program();
   GLCheckDbg("Creating blend.");
+  passthrough_program = build_passthrough_program();
+
+
+  // context = GrContext::MakeGL();
+  // backend_texture = get_texture();
+  // glBindTexture(GL_TEXTURE_2D, backend_texture);
+  // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+  //              nullptr);
+  // GrGLTextureInfo texture_info = {
+  //   .fID = backend_texture,
+  //   .fTarget = GL_TEXTURE_2D,
+  //   .fFormat = GR_GL_RGBA8
+  // };
+  // GrBackendTexture texture(width, height, GrMipMapped::kNo, texture_info);
+  // surface = sk_sp(SkSurface::MakeFromBackendTexture(context.get(), texture, kTopLeft_GrSurfaceOrigin, 0,
+  //           kRGBA_8888_SkColorType, nullptr, nullptr));
+  // if (!surface) {
+  //   log_error("SkSurface::MakeRenderTarget returned null");
+  //   exit(1);
+  // }
+  // canvas = surface->getCanvas();
+  // if (canvas == nullptr) {
+  //   log_error("no canvas");
+  //   exit(1);
+  // }
 }
 
 void loadTexture(uint32_t textureID, int width, int height, const uint8_t *buffer) {
@@ -145,6 +241,7 @@ void loadTexture(uint32_t textureID, int width, int height, const uint8_t *buffe
 void invertFrame(uint32_t textureID) {
   auto program = get_invert_program();
   glUseProgram(program);
+  // glBindVertexArray(invert_program.vertex_array);
   glUniform1i(glGetUniformLocation(program, "tex"), textureID);
 
   glBindBuffer(GL_ARRAY_BUFFER, invert_program.texture_buffer);
@@ -152,11 +249,14 @@ void invertFrame(uint32_t textureID) {
   glEnableVertexAttribArray(loc);
   glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
   glDrawArrays(GL_TRIANGLES, 0, 6);
+
+  GLCheckDbg("Invert.");
 }
 
 void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
   auto program = get_blend_program();
   glUseProgram(program);
+  // glBindVertexArray(blend_program.vertex_array);
   glUniform1f(glGetUniformLocation(program, "blendFactor"), blend_ratio);
   glUniform1i(glGetUniformLocation(program, "tex1"), texture1ID);
   glUniform1i(glGetUniformLocation(program, "tex2"), texture2ID);
@@ -167,6 +267,43 @@ void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
 
 void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
   glReadPixels(0, 0, width, height, PIXEL_FORMAT, GL_UNSIGNED_BYTE, outputBuffer);
+}
+
+void render_text(string text) {
+  GLCheckDbg("push");
+  //glPushAttrib(GL_ALL_ATTRIB_BITS);
+  GLCheckDbg("push");
+  auto text_color = SkColor4f::FromColor(SkColorSetARGB(255, 0, 0, 255));
+  SkPaint paint2(text_color);
+  auto text_blob = SkTextBlob::MakeFromString(text.c_str(), SkFont(nullptr, 22));
+  canvas->drawTextBlob(text_blob.get(), 100, 50, paint2);
+
+  auto texture = surface->getBackendTexture(SkSurface::kFlushRead_BackendHandleAccess);
+  GrGLTextureInfo texture_info;
+  if (!texture.isValid()) {
+    log_error("missing texture");
+    exit(1);
+  }
+  if (!texture.getGLTextureInfo(&texture_info)) {
+    log_error("missing texture info");
+    exit(1);
+  }
+
+  GLCheckDbg("Skia");
+  
+  //glPopClientAttrib();
+  //glPopAttrib();
+
+  GLCheckDbg("pop");
+
+  GLint fbo;
+  glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbo);
+  log_info("B: %d", fbo);
+
+  invertFrame(backend_texture);
+
+  glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbo);
+  log_info("A: %d", fbo);
 }
 
 void tearDownOpenGL() {
