@@ -6,7 +6,8 @@ hello_world: clean small_bunny_1080p_60fps.mp4
 	  && ./build/hello_world $(lastword $?)
 
 ./build/libskia.a: 
-	cd submodules/skia/ &&\
+	cd third_party/skia/ &&\
+	python2 tools/git-sync-deps &&\
 	bin/gn gen out/skia/  --args='cc="clang" cxx="clang++" is_official_build=true skia_use_system_libjpeg_turbo=false skia_use_system_harfbuzz=false skia_use_system_libwebp=false skia_use_system_icu=false' &&\
 	ninja -C out/skia/ &&\
 	cp ./out/skia/*.a ./../../build/
@@ -19,7 +20,7 @@ transcoding: ./build/libskia.a
 	-lboost_date_time -lavformat -lavcodec -lswscale -lz -lglfw -lavutil -framework OpenGL \
 	./src/*.cpp ./src/opengl/*.cpp ./src/transcoding/*.cpp \
 	./build/*.a $(SKIA_LIBS) \
-	 -I./src/ -I./src/opengl/ -I./src/transcoding/ -I./build -I./submodules/skia/include/core -I./submodules/skia/include/gpu -I./submodules/skia/ \
+	 -I./src/ -I./src/opengl/ -I./src/transcoding/ -I./build -I./third_party/skia/include/core -I./third_party/skia/include/gpu -I./third_party/skia/ \
 	 -include all.hpp -stdlib=libc++ -DGL_SILENCE_DEPRECATION=1 -DDEBUG=1 &&\
 	 cd ./build &&\
 	 ./transcoding ./../movies/small_bunny_1080p_60fps.mp4 ./../movies/dog.mp4  ./../movies/bunny_2s_gop.mp4 0.5 2 4

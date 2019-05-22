@@ -1,3 +1,4 @@
-[submodule "submodules/skia"]
-	path = submodules/skia
+
+[submodule "third_party/skia"]
+	path = third_party/skia
 	url = https://skia.googlesource.com/skia.git
