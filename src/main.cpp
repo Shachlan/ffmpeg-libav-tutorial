@@ -85,8 +85,8 @@ int main(int argc, char *argv[]) {
     glClearColor(0,0,0,0);
     glClear(GL_COLOR_BUFFER_BIT);
     loadTexture(tex1, decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
-    invertFrame(tex1);
-    //render_text("Inverting " + std::to_string(decoder->get_current_timestamp()));
+    //invertFrame(tex1);
+    render_text("Inverting " + std::to_string(decoder->get_current_timestamp()));
     getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
     encoder->encode_video_frame(source_time_base, decoder->get_current_timestamp());
   }

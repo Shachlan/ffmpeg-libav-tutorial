@@ -252,7 +252,7 @@ void loadTexture(uint32_t textureID, int width, int height, const uint8_t *buffe
 void invertFrame(uint32_t textureID) {
   auto program = get_invert_program();
   glUseProgram(program);
-  // glBindVertexArray(invert_program.vertex_array);
+  glBindVertexArray(invert_program.vertex_array);
   glUniform1i(glGetUniformLocation(program, "tex"), textureID);
 
   glBindBuffer(GL_ARRAY_BUFFER, invert_program.texture_buffer);
@@ -264,10 +264,25 @@ void invertFrame(uint32_t textureID) {
   GLCheckDbg("Invert.");
 }
 
+void passthroughFrame(uint32_t textureID) {
+  auto program = get_passthrough_program();
+  glUseProgram(program);
+  glBindVertexArray(passthrough_program.vertex_array);
+  glUniform1i(glGetUniformLocation(program, "tex"), textureID);
+
+  glBindBuffer(GL_ARRAY_BUFFER, passthrough_program.texture_buffer);
+  GLint loc = glGetAttribLocation(program, "texCoord");
+  glEnableVertexAttribArray(loc);
+  glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+
+  GLCheckDbg("Invert.");
+}
+
 void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
   auto program = get_blend_program();
   glUseProgram(program);
-  // glBindVertexArray(blend_program.vertex_array);
+  glBindVertexArray(blend_program.vertex_array);
   glUniform1f(glGetUniformLocation(program, "blendFactor"), blend_ratio);
   glUniform1i(glGetUniformLocation(program, "tex1"), texture1ID);
   glUniform1i(glGetUniformLocation(program, "tex2"), texture2ID);
@@ -281,32 +296,30 @@ void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
 }
 
 void render_text(string text) {
+  GLCheckDbg("Entering skia");
+  glBindVertexArray(0);
+  context->resetContext();
   auto text_color = SkColor4f::FromColor(SkColorSetARGB(255, 0, 0, 255));
   SkPaint paint2(text_color);
   auto text_blob = SkTextBlob::MakeFromString(text.c_str(), SkFont(nullptr, 22));
   canvas->drawTextBlob(text_blob.get(), 100, 50, paint2);
-
-  auto texture = surface->getBackendTexture(SkSurface::kFlushRead_BackendHandleAccess);
-  GrGLTextureInfo texture_info;
-  if (!texture.isValid()) {
-    log_error("missing texture");
-    exit(1);
-  }
-  if (!texture.getGLTextureInfo(&texture_info)) {
-    log_error("missing texture info");
-    exit(1);
-  }
-
+  canvas->flush();
   GLCheckDbg("Skia");
 
-  GLint fbo;
-  glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbo);
-  log_info("B: %d", fbo);
+  // auto texture = surface->getBackendTexture(SkSurface::kFlushRead_BackendHandleAccess);
+  // GrGLTextureInfo texture_info;
+  // if (!texture.isValid()) {
+  //   log_error("missing texture");
+  //   exit(1);
+  // }
+  // if (!texture.getGLTextureInfo(&texture_info)) {
+  //   log_error("missing texture info");
+  //   exit(1);
+  // }
 
-  invertFrame(backend_texture);
+  // GLCheckDbg("Skia get texture");
 
-  glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbo);
-  log_info("A: %d", fbo);
+  passthroughFrame(backend_texture);
 }
 
 void tearDownOpenGL() {
