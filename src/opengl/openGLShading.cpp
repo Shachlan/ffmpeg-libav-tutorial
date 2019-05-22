@@ -70,6 +70,11 @@ uint32_t get_texture() {
   return texture_pool.get_texture();
 }
 
+void release_texture(uint32_t textureID) {
+  texture_pool.release_texture(textureID);
+  texture_pool.flush();
+}
+
 static GLuint generate_vertex_array() {
   GLuint vao;
   GLCheckDbg("reality check.");
@@ -242,17 +247,25 @@ void setupOpenGL(int width, int height, char *canvasName) {
   }
 }
 
-void loadTexture(uint32_t textureID, int width, int height, const uint8_t *buffer) {
-  glBindTexture(GL_TEXTURE_2D, textureID);
+GLuint loadTexture(int width, int height, const uint8_t *buffer) {
+  GLuint textureID = get_texture();
+  GLCheckDbg("get texture");
   glActiveTexture(GL_TEXTURE0 + textureID);
+  GLCheckDbg("active texture");
+  glBindTexture(GL_TEXTURE_2D, textureID);
+  GLCheckDbg("bind texture");
   glTexImage2D(GL_TEXTURE_2D, 0, PIXEL_FORMAT, width, height, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE,
                buffer);
+  GLCheckDbg("load texture");
+  return textureID;
 }
 
 void invertFrame(uint32_t textureID) {
   auto program = get_invert_program();
   glUseProgram(program);
   glBindVertexArray(invert_program.vertex_array);
+   glBindTexture(GL_TEXTURE_2D, textureID);
+  glActiveTexture(GL_TEXTURE0 + textureID);
   glUniform1i(glGetUniformLocation(program, "tex"), textureID);
 
   glBindBuffer(GL_ARRAY_BUFFER, invert_program.texture_buffer);
@@ -280,12 +293,26 @@ void passthroughFrame(uint32_t textureID) {
 }
 
 void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
+  GLCheckDbg("sanity check");
   auto program = get_blend_program();
   glUseProgram(program);
+  GLCheckDbg("use blend program");
   glBindVertexArray(blend_program.vertex_array);
+   GLCheckDbg("bind vertex array");
   glUniform1f(glGetUniformLocation(program, "blendFactor"), blend_ratio);
+   GLCheckDbg("set blend factor");
+   glBindTexture(GL_TEXTURE_2D, texture1ID);
+   GLCheckDbg("bind texture 1.");
+  glActiveTexture(GL_TEXTURE0 + texture1ID);
+  GLCheckDbg("active texture 1");
   glUniform1i(glGetUniformLocation(program, "tex1"), texture1ID);
+  GLCheckDbg("set texture 1");
+   glBindTexture(GL_TEXTURE_2D, texture2ID);
+   GLCheckDbg("bind texture 2.");
+  glActiveTexture(GL_TEXTURE0 + texture2ID);
+  GLCheckDbg("active texture 2");
   glUniform1i(glGetUniformLocation(program, "tex2"), texture2ID);
+  GLCheckDbg("set texture 2");
   GLCheckDbg("Setting up draw.");
   glDrawArrays(GL_TRIANGLES, 0, 6);
   GLCheckDbg("Draw.");
@@ -295,10 +322,11 @@ void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
   glReadPixels(0, 0, width, height, PIXEL_FORMAT, GL_UNSIGNED_BYTE, outputBuffer);
 }
 
-void render_text(string text) {
+uint32_t render_text(string text) {
   GLCheckDbg("Entering skia");
   glBindVertexArray(0);
   context->resetContext();
+  canvas->clear(SkColorSetARGB(0, 0, 0, 0));
   auto text_color = SkColor4f::FromColor(SkColorSetARGB(255, 0, 0, 255));
   SkPaint paint2(text_color);
   auto text_blob = SkTextBlob::MakeFromString(text.c_str(), SkFont(nullptr, 22));
@@ -319,7 +347,11 @@ void render_text(string text) {
 
   // GLCheckDbg("Skia get texture");
 
-  passthroughFrame(backend_texture);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glClearColor(0,0,0,0);
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  return backend_texture;
 }
 
 void tearDownOpenGL() {

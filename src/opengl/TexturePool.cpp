@@ -8,6 +8,7 @@
 using namespace WREOpenGL;
 
 GLuint create_texture() {
+  log_info("create texture");
   GLuint textureLoc;
   glGenTextures(1, &textureLoc);
   GLCheckDbg("Failed to generate texture.");

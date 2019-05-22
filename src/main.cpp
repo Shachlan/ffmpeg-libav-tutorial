@@ -14,28 +14,28 @@ extern "C" {
 
 #define FRONTEND 0;
 
-static void invert_single_frame(WREVideoDecoder *decoder, WREEncoder *encoder, uint32_t textureID) {
-  loadTexture(textureID, decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
-  invertFrame(textureID);
-  getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
-}
+// static void invert_single_frame(WREVideoDecoder *decoder, WREEncoder *encoder, uint32_t textureID) {
+//   loadTexture(textureID, decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
+//   invertFrame(textureID);
+//   getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
+// }
 
-static void blend_frames(WREVideoDecoder *decoder, WREVideoDecoder *secondary_decoder,
-                         WREEncoder *encoder, uint32_t texture1ID, uint32_t texture2ID,
-                         float blend_ratio) {
-  loadTexture(texture1ID, decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
-  loadTexture(texture2ID, secondary_decoder->get_width(), secondary_decoder->get_height(),
-              secondary_decoder->get_rgb_buffer());
-  blendFrames(texture1ID, texture2ID, blend_ratio);
-  getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
-}
+// static void blend_frames(WREVideoDecoder *decoder, WREVideoDecoder *secondary_decoder,
+//                          WREEncoder *encoder, uint32_t texture1ID, uint32_t texture2ID,
+//                          float blend_ratio) {
+//   loadTexture(texture1ID, decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
+//   loadTexture(texture2ID, secondary_decoder->get_width(), secondary_decoder->get_height(),
+//               secondary_decoder->get_rgb_buffer());
+//   blendFrames(texture1ID, texture2ID, blend_ratio);
+//   getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
+// }
 
 int main(int argc, char *argv[]) {
   try {
   av_log_set_level(AV_LOG_FATAL);
   log_debug("start");
-  int height = 200;
-  int width = 300;
+  int height = 1080;
+  int width = 1920;
   auto expected_framerate = 30;
 
   auto decoder = new WREVideoDecoder(argv[1], expected_framerate, 1, 5, 2);
@@ -66,8 +66,6 @@ int main(int argc, char *argv[]) {
   int length = atoi(argv[6]);
 
   setupOpenGL(width, height, NULL);
-  uint32_t tex1 = get_texture();
-  uint32_t tex2 = get_texture();
 
   double source_time_base = decoder->get_time_base();
   double duration_in_seconds = secondary_decoder->get_duration();
@@ -84,10 +82,11 @@ int main(int argc, char *argv[]) {
     counted_frames++;
     glClearColor(0,0,0,0);
     glClear(GL_COLOR_BUFFER_BIT);
-    loadTexture(tex1, decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
-    //invertFrame(tex1);
-    render_text("Inverting " + std::to_string(decoder->get_current_timestamp()));
+    auto rendererd_text = render_text("Inverting " + std::to_string(decoder->get_current_timestamp()));
+    auto loaded_texture = loadTexture(decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
+    blendFrames(rendererd_text, loaded_texture, 0.5);
     getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
+    release_texture(loaded_texture);
     encoder->encode_video_frame(source_time_base, decoder->get_current_timestamp());
   }
 
