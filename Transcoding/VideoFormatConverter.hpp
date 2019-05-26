@@ -1,6 +1,8 @@
 // Copyright (c) 2019 Lightricks. All rights reserved.
 // Created by Shachar Langbeheim.
 
+#pragma once
+
 #include <functional>
 #include <shared_mutex>
 
@@ -15,7 +17,8 @@ extern "C" {
 namespace WRETranscoding {
 
 /// Context used in order to convert data between \c AVFrame objects and an internal RGB data
-/// buffer, which can be retrieved using \c get_rgb_buffer.
+/// buffer, which can be retrieved using \c read_from_rgb_buffer or modified using
+/// \c write_to_rgb_buffer.
 ///
 /// @important any given converter can only handle conversion in one way - either from
 /// a given frame to an RGB data buffer, or from the data buffer to a given frame. This
@@ -24,13 +27,18 @@ namespace WRETranscoding {
 ///
 /// This object is threadsafe.
 struct VideoFormatConverter {
+    /// Tag for converters used in encoding.
+  struct EncodingConverionTag {};
+
+  /// Tag for converters used in decoding.
+  struct DecodingConverionTag {};
+
+  /// Construct a new converter, from RGB pixel data to the given \c context.
+  VideoFormatConverter(AVCodecContext *context, EncodingConverionTag);
+
+  /// Construct a new converter, from the given \c context to RGB pixel data.
+  VideoFormatConverter(AVCodecContext *context, DecodingConverionTag);
   ~VideoFormatConverter();
-
-  /// Returns a new converter, from RGB pixel data to the given \c context.
-  static VideoFormatConverter *create_encoding_conversion_context(AVCodecContext *context);
-
-  /// Returns a new converter, from the given \c context to RGB pixel data.
-  static VideoFormatConverter *create_decoding_conversion_context(AVCodecContext *context);
 
   /// Converts the data in the given \c frame into the internal RGB buffer. This takes the data in
   /// \c frame, converts its colorspace to the colorspace of the converter and scales the data from
@@ -43,12 +51,32 @@ struct VideoFormatConverter {
   void convert_to_frame(AVFrame *frame);
 
   /// Calls the given \c buffer_read function over the internal RGB buffer.
-  /// This will allow the function to access the buffer da, without modifying it.
-  void read_from_rgb_buffer(std::function<void(const uint8_t *)> buffer_read) const;
+  /// This will allow the function to access the buffer da, without modifying it. Passing
+  /// the pointer outside of \c buffer_read and accessing the buffer from out of the call's scope
+  /// might lead to a data race, and is forbidden. Access to the internal buffer is protected only
+  /// until \c buffer_read returns, so \c buffer_read cannot start an asynchronous operation
+  /// without waiting for all buffer access operations to complete.
+  /// 
+  /// @note TReadFunc must take \c const \c uint8_t * as a single argument.
+  template <class TReadFunc>
+  decltype(auto) read_from_rgb_buffer(TReadFunc &&buffer_read) const {
+    std::shared_lock lock(mutex);
+    return buffer_read(rgb_buffer[0]);
+  }
 
   /// Calls the given \c buffer_write function over the internal RGB buffer.
-  /// This will allow the function to access the buffer data and modify it.
-  void write_to_rgb_buffer(std::function<void(uint8_t *)> buffer_write);
+  /// This will allow the function to access the buffer data and modify it. Passing
+  /// the pointer outside of \c buffer_write and accessing the buffer from out of the call's scope
+  /// might lead to a data race, and is forbidden. Access to the internal buffer is protected only
+  /// until \c buffer_write returns, so \c buffer_write cannot start an asynchronous operation
+  /// without waiting for all buffer access operations to complete.
+  /// 
+  /// @note TWriteFunc must take \c uint8_t * as a single argument.
+  template <class TWriteFunc>
+  decltype(auto) write_to_rgb_buffer(TWriteFunc &&buffer_write) {
+    std::unique_lock lock(mutex);
+    return buffer_write(rgb_buffer[0]);
+  }
 
 private:
   /// Context for conversion between formats.

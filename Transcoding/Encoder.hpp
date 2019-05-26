@@ -3,6 +3,8 @@
 
 #include <functional>
 
+#include "Transcoding/VideoFormatConverter.hpp"
+
 struct AVFormatContext;
 
 namespace WRETranscoding {
@@ -28,8 +30,17 @@ public:
 
   /// Calls the given \c buffer_write function over the internal RGB buffer, sized  3 * width *
   /// height. This will allow the function to access the buffer data and modify it. This data should
-  /// be populated with RGB pixel information before calls to \c encode_video_frame.
-  void write_to_rgb_buffer(std::function<void(uint8_t *)> buffer_write);
+  /// be populated with RGB pixel information before calls to \c encode_video_frame. Passing
+  /// the pointer outside of \c buffer_write and accessing the buffer from out of the call's scope
+  /// might lead to a data race, and is forbidden. Access to the internal buffer is protected only
+  /// until \c buffer_write returns, so \c buffer_write cannot start an asynchronous operation
+  /// without waiting for all buffer access operations to complete.
+  /// 
+  /// @note TWriteFunc must take \c uint8_t * as a single argument.
+  template <class TWriteFunc>
+  decltype(auto) write_to_rgb_buffer(TWriteFunc &&buffer_write) {
+    return video_conversion_context->write_to_rgb_buffer(buffer_write);
+  }
 
   /// Encodes the information in the internal data buffer as a video frame timestamped as
   /// source_timestamp * source_time_base. Returns 0 if encoding succeeded.

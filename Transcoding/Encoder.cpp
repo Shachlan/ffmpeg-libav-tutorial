@@ -73,7 +73,6 @@ static int prepare_audio_encoder(TranscodingComponents *encoder, AVFormatContext
   encoder->stream = avformat_new_stream(format_context, NULL);
   encoder->codec = avcodec_find_encoder(decoder->codec->id);
   encoder->frame = decoder->frame;
-  encoder->shared_frame = true;
   encoder->packet = av_packet_alloc();
   avcodec_parameters_copy(encoder->stream->codecpar, decoder->stream->codecpar);
   if (!encoder->codec) {
@@ -111,22 +110,22 @@ static int prepare_audio_encoder(TranscodingComponents *encoder, AVFormatContext
 Encoder::Encoder(string file_name, string video_codec_name, int video_width, int video_height,
                  double video_framerate, const TranscodingComponents *audio_decoder) {
   log_info("Opening encoder for %s", file_name.c_str());
-  video_encoder = unique_ptr<TranscodingComponents>{new TranscodingComponents()};
+  video_encoder = std::make_unique<TranscodingComponents>();
 
   avformat_alloc_output_context2(&format_context, NULL, NULL, file_name.c_str());
   if (!format_context) {
-    throw new TranscodingException("could not allocate memory for output format");
+    throw TranscodingException("could not allocate memory for output format");
   }
 
   if (prepare_video_encoder(video_encoder.get(), format_context, video_width, video_height,
                             video_codec_name, wre_double_to_rational(video_framerate)) != 0) {
-    throw new TranscodingException("error while preparing video encoder");
+    throw TranscodingException("error while preparing video encoder");
   }
 
   if (audio_decoder != nullptr) {
-    audio_encoder = unique_ptr<TranscodingComponents>{new TranscodingComponents()};
+    audio_encoder = std::make_unique<TranscodingComponents>();
     if (prepare_audio_encoder(audio_encoder.get(), format_context, audio_decoder) != 0) {
-      throw new TranscodingException("error while preparing audio copy");
+      throw TranscodingException("error while preparing audio copy");
     }
   } else {
     audio_encoder = nullptr;
@@ -137,14 +136,14 @@ Encoder::Encoder(string file_name, string video_codec_name, int video_width, int
 
   if (!(format_context->oformat->flags & AVFMT_NOFILE)) {
     if (avio_open(&format_context->pb, file_name.c_str(), AVIO_FLAG_WRITE) < 0) {
-      throw new TranscodingException("could not open the output file");
+      throw TranscodingException("could not open the output file");
     }
   }
   if (avformat_write_header(format_context, NULL) < 0) {
-    throw new TranscodingException("an error occurred when opening output file");
+    throw TranscodingException("an error occurred when opening output file");
   }
-  video_conversion_context = unique_ptr<VideoFormatConverter>{
-      VideoFormatConverter::create_encoding_conversion_context(video_encoder->context)};
+  video_conversion_context = std::make_unique<VideoFormatConverter>(
+    video_encoder->context, VideoFormatConverter::EncodingConverionTag{});
 }
 
 static int encode_frame(TranscodingComponents *encoder, AVFormatContext *format_context,
@@ -198,10 +197,6 @@ int Encoder::finish_encoding() {
   }
   av_write_trailer(format_context);
   return 0;
-}
-
-void Encoder::write_to_rgb_buffer(std::function<void(uint8_t *)> buffer_write) {
-  video_conversion_context->write_to_rgb_buffer(buffer_write);
 }
 
 int Encoder::get_width() {

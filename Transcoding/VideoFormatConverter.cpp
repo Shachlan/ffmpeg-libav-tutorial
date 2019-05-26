@@ -39,22 +39,16 @@ uint8_t **rgb_buffer_for_codec(AVCodecContext *codec) {
   return rgb_buffer_for_size(codec->width, codec->height);
 }
 
-VideoFormatConverter *VideoFormatConverter::create_encoding_conversion_context(
-    AVCodecContext *codec) {
-  auto context = new VideoFormatConverter();
-  context->conversion_context = conversion_context_from_rgb_to_codec(codec);
-  context->linesize = linesize_for_codec(codec);
-  context->rgb_buffer = rgb_buffer_for_codec(codec);
-  return context;
+VideoFormatConverter::VideoFormatConverter(AVCodecContext *codec, EncodingConverionTag) {
+  this->conversion_context = conversion_context_from_rgb_to_codec(codec);
+  this->linesize = linesize_for_codec(codec);
+  this->rgb_buffer = rgb_buffer_for_codec(codec);
 }
 
-VideoFormatConverter *VideoFormatConverter::create_decoding_conversion_context(
-    AVCodecContext *codec) {
-  auto context = new VideoFormatConverter();
-  context->conversion_context = conversion_context_from_codec_to_rgb(codec);
-  context->linesize = linesize_for_codec(codec);
-  context->rgb_buffer = rgb_buffer_for_codec(codec);
-  return context;
+VideoFormatConverter::VideoFormatConverter(AVCodecContext *codec, DecodingConverionTag) {
+  this->conversion_context = conversion_context_from_codec_to_rgb(codec);
+  this->linesize = linesize_for_codec(codec);
+  this->rgb_buffer = rgb_buffer_for_codec(codec);
 }
 
 VideoFormatConverter::~VideoFormatConverter() {
@@ -74,15 +68,4 @@ void VideoFormatConverter::convert_to_frame(AVFrame *frame) {
   std::shared_lock lock(mutex);
   sws_scale(this->conversion_context, (const uint8_t *const *)this->rgb_buffer, this->linesize, 0,
             frame->height, frame->data, frame->linesize);
-}
-
-void VideoFormatConverter::read_from_rgb_buffer(
-    std::function<void(const uint8_t *)> buffer_read) const {
-  std::shared_lock lock(mutex);
-  buffer_read(rgb_buffer[0]);
-}
-
-void VideoFormatConverter::write_to_rgb_buffer(std::function<void(uint8_t *)> buffer_write) {
-  std::unique_lock lock(mutex);
-  buffer_write(rgb_buffer[0]);
 }

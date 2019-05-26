@@ -3,6 +3,7 @@
 
 #include <functional>
 
+#include "Transcoding/VideoFormatConverter.hpp"
 namespace WRETranscoding {
 
 struct DecoderImplementation;
@@ -79,11 +80,19 @@ struct VideoDecoder : Decoder {
   /// start_from) / speed_ratio.
   VideoDecoder(string file_name, double expected_framerate = 0, double start_from = 0,
                double duration = UINT32_MAX, double speed_ratio = 1);
-  ~VideoDecoder();
 
   /// Calls the given \c buffer_read function over the internal RGB buffer, sized 3 * width *
-  /// height. This will allow the function to access the buffer da, without modifying it.
-  void read_from_rgb_buffer(std::function<void(const uint8_t *)> buffer_read) const;
+  /// height. This will allow the function to access the buffer da, without modifying it. Passing
+  /// the pointer outside of \c buffer_read and accessing the buffer from out of the call's scope
+  /// might lead to a data race, and is forbidden. Access to the internal buffer is protected only
+  /// until \c buffer_read returns, so \c buffer_read cannot start an asynchronous operation
+  /// without waiting for all buffer access operations to complete.
+  /// 
+  /// @note TReadFunc must take \c const \c uint8_t * as a single argument.
+  template <class TReadFunc>
+  decltype(auto) read_from_rgb_buffer(TReadFunc &&buffer_read) const {
+    return this->video_conversion_context->read_from_rgb_buffer(buffer_read);
+  }
 
   /// Returns the width, in pixels, of the decoded video.
   int get_width();

@@ -20,7 +20,6 @@ struct TranscodingComponents {
   AVPacket *packet;
   AVFrame *frame;
   AVRational latest_time_base;
-  bool shared_frame;
 };
 
 }  // namespace WRETranscoding

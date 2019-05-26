@@ -38,21 +38,21 @@ struct DecoderImplementation : TranscodingComponents {
     AVFormatContext *format_context = avformat_alloc_context();
     this->format_context = format_context;
     if (!format_context) {
-      throw new TranscodingException("could not allocate memory for Format Context");
+      throw TranscodingException("could not allocate memory for Format Context");
     }
 
     int result = avformat_open_input(&format_context, file_name.c_str(), NULL, NULL);
     if (result != 0) {
-      throw new TranscodingException("could not open %s", file_name.c_str());
+      throw TranscodingException("could not open %s", file_name.c_str());
     }
 
     if (avformat_find_stream_info(format_context, NULL) < 0) {
-      throw new TranscodingException("could not get the stream info for %s", file_name.c_str());
+      throw TranscodingException("could not get the stream info for %s", file_name.c_str());
     }
 
     int stream_index = av_find_best_stream(format_context, media_type, -1, -1, NULL, 0);
     if (stream_index < 0) {
-      throw new TranscodingException("could not get the stream index with error %d", stream_index);
+      throw TranscodingException("could not get the stream index with error %d", stream_index);
     }
     AVStream *stream = format_context->streams[stream_index];
 
@@ -60,11 +60,11 @@ struct DecoderImplementation : TranscodingComponents {
     this->codec = avcodec_find_decoder(stream->codecpar->codec_id);
     this->context = avcodec_alloc_context3(this->codec);
     if (avcodec_parameters_to_context(this->context, stream->codecpar) < 0) {
-      throw new TranscodingException("failed to copy codec params to codec context");
+      throw TranscodingException("failed to copy codec params to codec context");
     }
 
     if (avcodec_open2(this->context, this->codec, NULL) < 0) {
-      throw new TranscodingException("failed to open codec through avcodec_open2");
+      throw TranscodingException("failed to open codec through avcodec_open2");
     }
 
     auto inverted_time_base = av_q2d(av_inv_q(this->stream->time_base));
@@ -75,7 +75,7 @@ struct DecoderImplementation : TranscodingComponents {
       int result = av_seek_frame(this->format_context, this->stream->index, this->first_timestamp,
                                  AVSEEK_FLAG_BACKWARD | AVSEEK_FLAG_FRAME);
       if (result != 0) {
-        throw new TranscodingException("Failed to seek in file %s to %ld", file_name.c_str(),
+        throw TranscodingException("Failed to seek in file %s to %ld", file_name.c_str(),
                                        this->first_timestamp);
       }
     }
@@ -269,8 +269,9 @@ int Decoder::decode_next_frame() {
 
 AudioDecoder::AudioDecoder(string file_name, double start_from, double duration) {
   log_info("Open audio decoder from: %s", file_name.c_str());
-  decoder_implementation = unique_ptr<DecoderImplementation>{
-      new DecoderImplementation(file_name, start_from, duration, 1, AVMEDIA_TYPE_AUDIO)};
+  decoder_implementation = std::make_unique<DecoderImplementation>(
+    file_name, start_from, duration, 1, AVMEDIA_TYPE_AUDIO
+  );
 }
 
 TranscodingComponents *AudioDecoder::get_transcoding_components() {
@@ -280,16 +281,13 @@ TranscodingComponents *AudioDecoder::get_transcoding_components() {
 #pragma endregion AudioDecoder
 #pragma region VideoDecoder
 
-VideoDecoder::~VideoDecoder() = default;
-
 VideoDecoder::VideoDecoder(string file_name, double expected_framerate, double start_from,
                            double duration, double speed_ratio) {
   log_info("Open video decoder from: %s", file_name.c_str());
-  auto decoder = new VideoDecoderImplementation(
-      file_name, wre_double_to_rational(expected_framerate), start_from, duration, speed_ratio);
-  decoder_implementation = unique_ptr<DecoderImplementation>{decoder};
-  video_conversion_context = unique_ptr<VideoFormatConverter>{
-      VideoFormatConverter::create_decoding_conversion_context(decoder_implementation->context)};
+  decoder_implementation = std::make_unique<VideoDecoderImplementation>(
+    file_name, wre_double_to_rational(expected_framerate), start_from, duration, speed_ratio);
+  video_conversion_context = std::make_unique<VideoFormatConverter>(
+    decoder_implementation->context, VideoFormatConverter::DecodingConverionTag{});
 }
 
 int VideoDecoder::get_width() {
@@ -298,10 +296,6 @@ int VideoDecoder::get_width() {
 
 int VideoDecoder::get_height() {
   return decoder_implementation->context->height;
-}
-
-void VideoDecoder::read_from_rgb_buffer(std::function<void(const uint8_t *)> buffer_read) const {
-  return this->video_conversion_context->read_from_rgb_buffer(buffer_read);
 }
 
 int VideoDecoder::decode_next_frame() {
