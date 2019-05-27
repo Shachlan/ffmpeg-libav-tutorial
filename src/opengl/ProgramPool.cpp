@@ -70,7 +70,12 @@ static GLuint build_shader(const GLchar *shader_source, GLenum shader_type) {
   return 0;
 }
 
-static string get_shader_text(string shader_file_name) {
+string get_shader_filename(string shader, GLenum shader_type) {
+  return shader + (shader_type == GL_VERTEX_SHADER ? ".vsh" : ".fsh");
+}
+
+static string get_shader_text(string shader_name, GLenum shader_type) {
+  auto shader_file_name = get_shader_filename(shader_name, shader_type);
   std::ifstream stream(shader_file_name);
   if (!stream.is_open()) {
     throw_gl_exception("Can't open shader file %s", shader_file_name.c_str());
@@ -80,15 +85,10 @@ static string get_shader_text(string shader_file_name) {
   return buffer.str();
 }
 
-int build_shader(string shader_file_name, GLenum shader_type) {
-  auto text = get_shader_text(shader_file_name);
-  auto shader_name = build_shader(text.c_str(), shader_type);
+int build_shader(string shader_name, GLenum shader_type) {
+  auto text = get_shader_text(shader_name, shader_type);
 
-  return shader_name;
-}
-
-string get_shader_filename(string shader, GLenum shader_type) {
-  return shader + (shader_type == GL_VERTEX_SHADER ? ".vsh" : ".fsh");
+  return build_shader(text.c_str(), shader_type);
 }
 
 GLuint create_program(GLuint vertex_shader, GLuint fragment_shader) {
@@ -123,10 +123,8 @@ GLuint ProgramPool::get_program(string vertex_shader, string fragment_shader) {
     return search->second;
   }
 
-  auto v_shader_filename = get_shader_filename(vertex_shader, GL_VERTEX_SHADER);
-  auto v_shader_name = build_shader(v_shader_filename, GL_VERTEX_SHADER);
-  auto f_shader_filename = get_shader_filename(fragment_shader, GL_FRAGMENT_SHADER);
-  auto f_shader_name = build_shader(f_shader_filename, GL_FRAGMENT_SHADER);
+  auto v_shader_name = build_shader(vertex_shader, GL_VERTEX_SHADER);
+  auto f_shader_name = build_shader(fragment_shader, GL_FRAGMENT_SHADER);
   auto program = create_program(v_shader_name, f_shader_name);
 
   this->description_to_name_mapping[key] = program;
