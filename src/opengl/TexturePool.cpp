@@ -25,7 +25,19 @@ GLuint create_texture() {
 }
 
 GLuint TexturePool::get_texture() {
-  return create_texture();
+  GLuint name;
+  if (this->available_textures.empty()) {
+    name = create_texture();
+  } else {
+    name = *this->available_textures.begin();
+    this->available_textures.erase(name);
+  }
+
+  if (name > 0) {
+    used_textures.insert(name);
+  }
+
+  return name;
 }
 
 void TexturePool::release_texture(GLuint name) {

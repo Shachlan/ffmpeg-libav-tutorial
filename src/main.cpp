@@ -80,19 +80,28 @@ int main(int argc, char *argv[]) {
     long inverted_frames = 0;
     long audio_frames = 0;
 
+    auto primary_texture = -1;
+    auto secondary_texture = -1;
+
     while (decoder->decode_next_frame() >= 0) {
       counted_frames++;
       glClearColor(0, 0, 0, 0);
       glClear(GL_COLOR_BUFFER_BIT);
       auto rendererd_text =
           render_text("Inverting " + std::to_string(decoder->get_current_timestamp()));
-      auto loaded_texture =
-          loadTexture(decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
-      blendFrames(rendererd_text, loaded_texture, 0.5);
+      if (primary_texture == -1) {
+        primary_texture =
+            loadTexture(decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
+      } else {
+        loadTexture(primary_texture, decoder->get_width(), decoder->get_height(),
+                    decoder->get_rgb_buffer());
+      }
+
+      blendFrames(rendererd_text, primary_texture, 0.5);
       getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
-      release_texture(loaded_texture);
       encoder->encode_video_frame(source_time_base, decoder->get_current_timestamp());
     }
+    release_texture(primary_texture);
 
     double audio_time_base = audio_decoder->get_time_base();
     while (audio_decoder->decode_next_frame() == 0) {

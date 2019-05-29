@@ -263,16 +263,21 @@ void setupOpenGL(int width, int height, char *canvasName) {
   typeface = SkTypeface::MakeFromFile("./fonts/pacifico/Pacifico.ttf");
 }
 
-GLuint loadTexture(int width, int height, const uint8_t *buffer) {
-  GLuint textureID = get_texture();
-  GLCheckDbg("get texture");
-  glActiveTexture(GL_TEXTURE0 + textureID);
+void loadTexture(uint32_t texture_name, int width, int height, const uint8_t *buffer) {
+  glActiveTexture(GL_TEXTURE0 + texture_name);
   GLCheckDbg("active texture");
-  glBindTexture(GL_TEXTURE_2D, textureID);
+  glBindTexture(GL_TEXTURE_2D, texture_name);
   GLCheckDbg("bind texture");
   glTexImage2D(GL_TEXTURE_2D, 0, PIXEL_FORMAT, width, height, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE,
                buffer);
   GLCheckDbg("load texture");
+}
+
+GLuint loadTexture(int width, int height, const uint8_t *buffer) {
+  GLuint textureID = get_texture();
+  GLCheckDbg("get texture");
+
+  loadTexture(textureID, width, height, buffer);
   return textureID;
 }
 
