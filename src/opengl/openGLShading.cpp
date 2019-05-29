@@ -38,8 +38,10 @@ extern "C" {
 #include "SkImage.h"
 #include "SkPaint.h"
 #include "SkStream.h"
+#include "SkString.h"
 #include "SkSurface.h"
 #include "SkTextBlob.h"
+#include "SkTypeface.h"
 #include "gl/GrGLInterface.h"
 
 using namespace WREOpenGL;
@@ -353,10 +355,21 @@ uint32_t render_text(string text) {
   GLCheckDbg("Entering skia");
   glBindVertexArray(0);
   skiaContext->resetContext();
-  canvas->clear(SkColorSetARGB(255, 255, 0, 0));
+  canvas->clear(SkColorSetARGB(255, 0, 255, 0));
   auto text_color = SkColor4f::FromColor(SkColorSetARGB(255, 0, 0, 255));
   SkPaint paint2(text_color);
-  auto text_blob = SkTextBlob::MakeFromString(text.c_str(), SkFont(nullptr, 22));
+  auto typeface = SkTypeface::MakeFromFile("./pacifico/Pacifico.ttf");
+  if (typeface == nullptr) {
+    log_error("no typeface");
+    exit(1);
+  }
+  // SkString type_name;
+  // typeface->getFamilyName(&type_name);
+  // log_debug("getting family name");
+  // auto ID = typeface->uniqueID();
+  // log_debug("getting unique ID");
+  // log_info("type name: %s, ID: %d", type_name.c_str(), ID);
+  auto text_blob = SkTextBlob::MakeFromString(text.c_str(), SkFont(typeface, 22));
   canvas->drawTextBlob(text_blob.get(), 100, 50, paint2);
   canvas->flush();
   GLCheckDbg("Skia");
