@@ -67,11 +67,12 @@ GLFWwindow *window;
 #endif
 GLuint backend_texture;
 GLuint vertex_array;
+static sk_sp<SkTypeface> typeface;
 
 #if FRONTEND == 1
 
-static const float position[12] = {1.0f, 1.0f,  -1.0f, 1.0f, 1.0f,  -1.0f,
-                                   1.0f, -1.0f, -1.0f, 1.0f, -1.0f, -1.0f};
+static const float position[12] = {-1.0f, 1.0f,  1.0f, 1.0f, -1.0f, -1.0f,
+                                   -1.0f, -1.0f, 1.0f, 1.0f, 1.0f,  -1.0f};
 
 #else
 
@@ -258,6 +259,8 @@ void setupOpenGL(int width, int height, char *canvasName) {
     log_error("no canvas");
     exit(1);
   }
+
+  typeface = SkTypeface::MakeFromFile("./fonts/pacifico/Pacifico.ttf");
 }
 
 GLuint loadTexture(int width, int height, const uint8_t *buffer) {
@@ -355,10 +358,9 @@ uint32_t render_text(string text) {
   GLCheckDbg("Entering skia");
   glBindVertexArray(0);
   skiaContext->resetContext();
-  canvas->clear(SkColorSetARGB(255, 0, 255, 0));
+  canvas->clear(SkColorSetARGB(255, 0, 0, 0));
   auto text_color = SkColor4f::FromColor(SkColorSetARGB(255, 0, 0, 255));
   SkPaint paint2(text_color);
-  auto typeface = SkTypeface::MakeFromFile("./pacifico/Pacifico.ttf");
   if (typeface == nullptr) {
     log_error("no typeface");
     exit(1);
@@ -369,8 +371,8 @@ uint32_t render_text(string text) {
   // auto ID = typeface->uniqueID();
   // log_debug("getting unique ID");
   // log_info("type name: %s, ID: %d", type_name.c_str(), ID);
-  auto text_blob = SkTextBlob::MakeFromString(text.c_str(), SkFont(typeface, 22));
-  canvas->drawTextBlob(text_blob.get(), 100, 50, paint2);
+  auto text_blob = SkTextBlob::MakeFromString(text.c_str(), SkFont(typeface, 220));
+  canvas->drawTextBlob(text_blob.get(), 100, 250, paint2);
   canvas->flush();
   GLCheckDbg("Skia");
 

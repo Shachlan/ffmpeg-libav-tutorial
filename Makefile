@@ -6,7 +6,8 @@ hello_world: clean small_bunny_1080p_60fps.mp4
 	  && ./build/hello_world $(lastword $?)
 
 make-folder:
-	mkdir -p ./build
+	mkdir -p ./build &&\
+	mkdir -p ./build/fonts
 
 ./build/libskia.a: 
 	cd third_party/skia/ &&\
@@ -16,7 +17,7 @@ make-folder:
 	cp ./out/skia/*.a ./../../build/
 
 copy-fonts:
-	cp -r ./fonts/* ./build
+	cp -r ./fonts/* ./build/fonts
 
 transcoding: make-folder copy-fonts ./build/libskia.a 
 	cp ./src/opengl/shaders/* ./build/ &&\
