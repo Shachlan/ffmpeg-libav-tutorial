@@ -30,28 +30,37 @@ extern "C" {
 #include "ProgramPool.hpp"
 #include "TexturePool.hpp"
 
+#include <math.h>
 #include <src/gpu/gl/GrGlDefines.h>
 #include <sstream>
 #include "GrContext.h"
 #include "SkData.h"
 #include "SkFont.h"
+#include "SkGraphics.h"
 #include "SkImage.h"
 #include "SkPaint.h"
+#include "SkPictureRecorder.h"
 #include "SkStream.h"
 #include "SkString.h"
 #include "SkSurface.h"
 #include "SkTextBlob.h"
 #include "SkTypeface.h"
 #include "gl/GrGLInterface.h"
+#include "modules/skottie/include/Skottie.h"
+#include "src/core/SkMakeUnique.h"
+#include "src/core/SkOSFile.h"
+#include "src/utils/SkOSPath.h"
 
 using namespace WREOpenGL;
 
 static ProgramPool program_pool;
 static TexturePool texture_pool;
 
-static SkCanvas *canvas;
 static sk_sp<GrContext> skiaContext;
 static sk_sp<SkSurface> surface;
+static sk_sp<SkSurface> lottie_surface;
+GLuint backend_texture;
+GLuint lottie_texture;
 
 typedef struct {
   GLuint position_buffer;
@@ -65,9 +74,9 @@ ProgramInfo passthrough_program;
 #if FRONTEND == 0
 GLFWwindow *window;
 #endif
-GLuint backend_texture;
 GLuint vertex_array;
 static sk_sp<SkTypeface> typeface;
+static auto anim = skottie::Animation::Builder().makeFromFile("gear.json");
 
 #if FRONTEND == 1
 
@@ -187,6 +196,23 @@ ProgramInfo build_blend_program() {
   return (ProgramInfo){position_buffer, texture_buffer, vertex_array};
 }
 
+static sk_sp<SkSurface> create_surface(int width, int height, GLuint texture_name) {
+  glBindTexture(GL_TEXTURE_2D, texture_name);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  GrGLTextureInfo texture_info = {
+      .fID = texture_name, .fTarget = GL_TEXTURE_2D, .fFormat = GR_GL_RGBA8};
+  GrBackendTexture texture(width, height, GrMipMapped::kNo, texture_info);
+  auto surface =
+      sk_sp(SkSurface::MakeFromBackendTexture(skiaContext.get(), texture, kTopLeft_GrSurfaceOrigin,
+                                              0, kRGBA_8888_SkColorType, nullptr, nullptr));
+  if (!surface) {
+    log_error("SkSurface::MakeRenderTarget returned null");
+    exit(1);
+  }
+
+  return surface;
+}
+
 void setupOpenGL(int width, int height, char *canvasName) {
 #if FRONTEND == 1
   EmscriptenWebGLContextAttributes attrs;
@@ -242,23 +268,11 @@ void setupOpenGL(int width, int height, char *canvasName) {
 
   skiaContext = GrContext::MakeGL();
   backend_texture = get_texture();
-  glBindTexture(GL_TEXTURE_2D, backend_texture);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  GrGLTextureInfo texture_info = {
-      .fID = backend_texture, .fTarget = GL_TEXTURE_2D, .fFormat = GR_GL_RGBA8};
-  GrBackendTexture texture(width, height, GrMipMapped::kNo, texture_info);
-  surface =
-      sk_sp(SkSurface::MakeFromBackendTexture(skiaContext.get(), texture, kTopLeft_GrSurfaceOrigin,
-                                              0, kRGBA_8888_SkColorType, nullptr, nullptr));
-  if (!surface) {
-    log_error("SkSurface::MakeRenderTarget returned null");
-    exit(1);
-  }
-  canvas = surface->getCanvas();
-  if (canvas == nullptr) {
-    log_error("no canvas");
-    exit(1);
-  }
+  lottie_texture = get_texture();
+  surface = create_surface(width, height, backend_texture);
+  lottie_surface = create_surface(width, height, lottie_texture);
+
+  SkAutoGraphics ag;
 
   typeface = SkTypeface::MakeFromFile("./fonts/pacifico/Pacifico.ttf");
 }
@@ -363,6 +377,7 @@ uint32_t render_text(string text) {
   GLCheckDbg("Entering skia");
   glBindVertexArray(0);
   skiaContext->resetContext();
+  auto canvas = surface->getCanvas();
   canvas->clear(SkColorSetARGB(255, 0, 0, 0));
   auto text_color = SkColor4f::FromColor(SkColorSetARGB(255, 0, 0, 255));
   SkPaint paint2(text_color);
@@ -408,4 +423,38 @@ void tearDownOpenGL() {
   texture_pool.clear();
   glfwDestroyWindow(window);
 #endif
+}
+
+uint32_t render_lottie(double time) {
+  double intpart;
+  GLCheckDbg("lottie start");
+
+  auto fractpart = modf(time, &intpart);
+  anim->seek(fractpart);
+
+  GLCheckDbg("lottie seek");
+  auto canvas = lottie_surface->getCanvas();
+  GLCheckDbg("lottie get canvas");
+
+  SkAutoCanvasRestore acr(canvas, true);
+
+  GLCheckDbg("lottie restore");
+
+  // log_info("canvas concat");
+  // canvas->concat(SkMatrix::MakeRectToRect(SkRect::MakeSize(anim->size()), SkRect::MakeIWH(128,
+  // 128),
+  //                                         SkMatrix::kCenter_ScaleToFit));
+
+  canvas->clear(SK_ColorTRANSPARENT);
+  GLCheckDbg("lottie clear");
+
+  anim->render(canvas);
+
+  GLCheckDbg("lottie render");
+
+  canvas->flush();
+
+  GLCheckDbg("lottie flush");
+
+  return lottie_texture;
 }

@@ -10,6 +10,8 @@ void tearDownOpenGL();
 
 uint32_t render_text(string text);
 
+uint32_t render_lottie(double time);
+
 #if FRONTEND == 0
 uint32_t get_texture();
 void release_texture(uint32_t textureID);

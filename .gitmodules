@@ -1,4 +1,4 @@
 
 [submodule "third_party/skia"]
 	path = third_party/skia
-	url = https://skia.googlesource.com/skia.git
+url=https://github.com/lightricks/skia

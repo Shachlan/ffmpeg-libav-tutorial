@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
       glClearColor(0, 0, 0, 0);
       glClear(GL_COLOR_BUFFER_BIT);
       auto rendererd_text =
-          render_text("Inverting " + std::to_string(decoder->get_current_timestamp()));
+          render_lottie(decoder->get_current_timestamp() * decoder->get_time_base());
       if (primary_texture == -1) {
         primary_texture =
             loadTexture(decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());

@@ -12,7 +12,7 @@ make-folder:
 ./build/libskia.a: 
 	cd third_party/skia/ &&\
 	python2 tools/git-sync-deps &&\
-	bin/gn gen out/skia/  --args='cc="clang" cxx="clang++" is_official_build=true skia_use_system_libjpeg_turbo=false skia_use_system_harfbuzz=false skia_use_system_libwebp=false skia_use_system_icu=false skia_use_freetype=true skia_use_system_freetype2=true' &&\
+	bin/gn gen out/skia/  --args='cc="clang" cxx="clang++" is_official_build=true skia_use_system_libjpeg_turbo=false skia_use_system_harfbuzz=false skia_use_system_libwebp=false skia_use_system_icu=false skia_use_freetype=true skia_use_system_freetype2=true skia_use_dng_sdk=false' &&\
 	ninja -C out/skia/ &&\
 	cp ./out/skia/*.a ./../../build/
 
@@ -20,9 +20,10 @@ copy-fonts:
 	cp -r ./fonts/* ./build/fonts
 
 transcoding: make-folder copy-fonts ./build/libskia.a 
+	cp gear.json ./build/ &&\
 	cp ./src/opengl/shaders/* ./build/ &&\
-	g++ -g -Wall -std=c++17 ./src/all.hpp -o ./build/all.hpp.gch \
-	&& g++ -g -std=c++17 -Wall -o build/transcoding \
+	clang++ -g -Wall -std=c++17 ./src/all.hpp -o ./build/all.hpp.gch \
+	&& clang++ -g -std=c++17 -Wall -o build/transcoding \
 	-lboost_date_time -lavformat -lavcodec -lswscale -lz -lglfw -lavutil -framework OpenGL \
 	./src/*.cpp ./src/opengl/*.cpp ./src/transcoding/*.cpp \
 	./build/*.a $(SKIA_LIBS) \
@@ -36,3 +37,11 @@ clean:
 
 fetch_small_bunny_video:
 	sudo ./fetch.sh
+
+SkottieTool: ./build/libskia.a 
+	clang++ -o ./skottie SkottieTool.cpp  \
+	-I./third_party/skia/include/core \
+	-I./third_party/skia/include/gpu \
+	-I./third_party/skia/ \
+	./build/*.a $(SKIA_LIBS) \
+	-std=c++17
