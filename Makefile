@@ -38,10 +38,10 @@ clean:
 fetch_small_bunny_video:
 	sudo ./fetch.sh
 
-SkottieTool: ./build/libskia.a 
+skottie: ./build/libskia.a SkottieTool.cpp
 	clang++ -o ./skottie SkottieTool.cpp  \
 	-I./third_party/skia/include/core \
 	-I./third_party/skia/include/gpu \
 	-I./third_party/skia/ \
-	./build/*.a $(SKIA_LIBS) \
+	./build/*.a $(SKIA_LIBS)  -lglfw -framework OpenGL \
 	-std=c++17

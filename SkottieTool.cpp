@@ -5,6 +5,9 @@
  * found in the LICENSE file.
  */
 
+#include <OpenGL/gl3.h>
+#include <src/gpu/gl/GrGlDefines.h>
+#include "GrContext.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkGraphics.h"
 #include "include/core/SkPictureRecorder.h"
@@ -15,6 +18,7 @@
 #include "src/core/SkOSFile.h"
 #include "src/utils/SkOSPath.h"
 
+#include <GLFW/glfw3.h>
 #include <vector>
 
 namespace {
@@ -47,11 +51,45 @@ private:
   const SkString fExtension;
 };
 
+static sk_sp<GrContext> skiaContext;
+GLFWwindow *window;
+
 class PNGSink final : public Sink {
 public:
+  static const int width = 128;
+  static const int height = 128;
+  static const int window_width = 1920;
+  static const int window_height = 1080;
+
   PNGSink() : INHERITED("png"), fSurface(SkSurface::MakeRasterN32Premul(128, 128)) {
+    if (!glfwInit()) {
+      exit(1);
+    }
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_VISIBLE, 0);
+    window = glfwCreateWindow(window_width, window_height, "", NULL, NULL);
+    if (window == NULL) {
+      exit(1);
+    }
+    glfwMakeContextCurrent(window);
+    skiaContext = GrContext::MakeGL();
+    uint32_t texture_name;
+    glGenTextures(1, &texture_name);
+    glBindTexture(GL_TEXTURE_2D, texture_name);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, window_width, window_height, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, nullptr);
+    GrGLTextureInfo texture_info = {
+        .fID = texture_name, .fTarget = GL_TEXTURE_2D, .fFormat = GR_GL_RGBA8};
+    GrBackendTexture texture(window_width, window_height, GrMipMapped::kNo, texture_info);
+    fSurface = sk_sp(SkSurface::MakeFromBackendTexture(skiaContext.get(), texture,
+                                                       kTopLeft_GrSurfaceOrigin, 0,
+                                                       kRGBA_8888_SkColorType, nullptr, nullptr));
+
     if (!fSurface) {
-      SkDebugf("Could not allocate a %d x %d surface.\n", 128, 128);
+      SkDebugf("Could not allocate a %d x %d surface.\n", width, height);
     }
   }
 
@@ -62,8 +100,9 @@ public:
     auto *canvas = fSurface->getCanvas();
     SkAutoCanvasRestore acr(canvas, true);
 
-    canvas->concat(SkMatrix::MakeRectToRect(
-        SkRect::MakeSize(anim->size()), SkRect::MakeIWH(128, 128), SkMatrix::kCenter_ScaleToFit));
+    canvas->concat(SkMatrix::MakeRectToRect(SkRect::MakeSize(anim->size()),
+                                            SkRect::MakeIWH(width, height),
+                                            SkMatrix::kCenter_ScaleToFit));
 
     canvas->clear(SK_ColorTRANSPARENT);
     anim->render(canvas);
@@ -78,7 +117,7 @@ public:
   }
 
 private:
-  const sk_sp<SkSurface> fSurface;
+  sk_sp<SkSurface> fSurface;
 
   using INHERITED = Sink;
 };
