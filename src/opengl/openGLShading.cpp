@@ -160,7 +160,7 @@ void setupOpenGL(int width, int height) {
 
   SkAutoGraphics ag;
 
-  anim = skottie::Animation::Builder().makeFromFile("gear.json");
+  anim = skottie::Animation::Builder().makeFromFile("data.json");
 
   typeface = SkTypeface::MakeFromFile("./fonts/pacifico/Pacifico.ttf");
 }

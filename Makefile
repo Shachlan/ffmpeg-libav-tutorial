@@ -20,7 +20,7 @@ copy-fonts:
 	cp -r ./fonts/* ./build/fonts
 
 transcoding: make-folder copy-fonts ./build/libskia.a 
-	cp gear.json ./build/ &&\
+	cp data.json ./build/ &&\
 	cp ./src/opengl/shaders/* ./build/ &&\
 	clang++ -g -Wall -std=c++17 ./src/all.hpp -o ./build/all.hpp.gch \
 	&& clang++ -g -std=c++17 -Wall -o build/transcoding \

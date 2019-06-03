@@ -51,7 +51,8 @@ int main(int argc, char *argv[]) {
     auto primary_texture = get_texture();
 
     while (decoder->decode_next_frame() >= 0) {
-      auto rendererd_text = render_lottie(0.1);
+      auto rendererd_text =
+          render_lottie(decoder->get_current_timestamp() * decoder->get_time_base());
       loadTexture(primary_texture, decoder->get_width(), decoder->get_height(),
                   decoder->get_rgb_buffer());
 
