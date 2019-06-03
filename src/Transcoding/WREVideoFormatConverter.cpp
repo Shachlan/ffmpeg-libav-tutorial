@@ -12,12 +12,12 @@ static struct SwsContext *conversion_context_from_codec_to_rgb(AVCodecContext *c
 static struct SwsContext *conversion_context_from_rgb_to_codec(AVCodecContext *codec) {
   int height = codec->height;
   int width = codec->width;
-  return sws_getContext(width, height, AV_PIX_FMT_RGBA, width, height, codec->pix_fmt, SWS_BICUBIC,
+  return sws_getContext(width, height, AV_PIX_FMT_RGB24, width, height, codec->pix_fmt, SWS_BICUBIC,
                         NULL, NULL, NULL);
 }
 
 static int *linesize_for_size(int width, int multiplier) {
-  int *linesize = (int *)calloc(4, sizeof(int));
+  int *linesize = (int *)calloc(3, sizeof(int));
   linesize[0] = multiplier * width * sizeof(uint8_t);
   return linesize;
 }
@@ -43,8 +43,8 @@ WREVideoFormatConverter *WREVideoFormatConverter::create_encoding_conversion_con
     AVCodecContext *codec) {
   auto context = new WREVideoFormatConverter();
   context->conversion_context = conversion_context_from_rgb_to_codec(codec);
-  context->linesize = linesize_for_codec(codec, 4);
-  context->rgb_buffer = rgb_buffer_for_codec(codec, 4);
+  context->linesize = linesize_for_codec(codec, 3);
+  context->rgb_buffer = rgb_buffer_for_codec(codec, 3);
   return context;
 }
 

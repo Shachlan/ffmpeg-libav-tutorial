@@ -194,7 +194,7 @@ void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
 
 void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
   glBindVertexArray(0);
-  glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, outputBuffer);
+  glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, outputBuffer);
 }
 
 uint32_t render_text(string text) {
