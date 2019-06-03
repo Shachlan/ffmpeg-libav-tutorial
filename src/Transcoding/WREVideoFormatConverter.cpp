@@ -12,28 +12,28 @@ static struct SwsContext *conversion_context_from_codec_to_rgb(AVCodecContext *c
 static struct SwsContext *conversion_context_from_rgb_to_codec(AVCodecContext *codec) {
   int height = codec->height;
   int width = codec->width;
-  return sws_getContext(width, height, AV_PIX_FMT_RGB24, width, height, codec->pix_fmt, SWS_BICUBIC,
+  return sws_getContext(width, height, AV_PIX_FMT_RGBA, width, height, codec->pix_fmt, SWS_BICUBIC,
                         NULL, NULL, NULL);
 }
 
-static int *linesize_for_size(int width) {
+static int *linesize_for_size(int width, int multiplier) {
   int *linesize = (int *)calloc(4, sizeof(int));
-  linesize[0] = 3 * width * sizeof(uint8_t);
+  linesize[0] = multiplier * width * sizeof(uint8_t);
   return linesize;
 }
 
-static int *linesize_for_codec(AVCodecContext *codec) {
-  return linesize_for_size(codec->width);
+static int *linesize_for_codec(AVCodecContext *codec, int multiplier) {
+  return linesize_for_size(codec->width, multiplier);
 }
 
-static uint8_t **rgb_buffer_for_size(int width, int height) {
+static uint8_t **rgb_buffer_for_size(int width, int height, int multiplier) {
   uint8_t **buffer = (uint8_t **)calloc(1, sizeof(uint8_t *));
-  buffer[0] = (uint8_t *)calloc(3 * height * width, sizeof(uint8_t));
+  buffer[0] = (uint8_t *)calloc(multiplier * height * width, sizeof(uint8_t));
   return buffer;
 }
 
-uint8_t **rgb_buffer_for_codec(AVCodecContext *codec) {
-  return rgb_buffer_for_size(codec->width, codec->height);
+uint8_t **rgb_buffer_for_codec(AVCodecContext *codec, int multiplier) {
+  return rgb_buffer_for_size(codec->width, codec->height, multiplier);
 }
 
 #pragma endregion
@@ -43,8 +43,8 @@ WREVideoFormatConverter *WREVideoFormatConverter::create_encoding_conversion_con
     AVCodecContext *codec) {
   auto context = new WREVideoFormatConverter();
   context->conversion_context = conversion_context_from_rgb_to_codec(codec);
-  context->linesize = linesize_for_codec(codec);
-  context->rgb_buffer = rgb_buffer_for_codec(codec);
+  context->linesize = linesize_for_codec(codec, 4);
+  context->rgb_buffer = rgb_buffer_for_codec(codec, 4);
   return context;
 }
 
@@ -52,8 +52,8 @@ WREVideoFormatConverter *WREVideoFormatConverter::create_decoding_conversion_con
     AVCodecContext *codec) {
   auto context = new WREVideoFormatConverter();
   context->conversion_context = conversion_context_from_codec_to_rgb(codec);
-  context->linesize = linesize_for_codec(codec);
-  context->rgb_buffer = rgb_buffer_for_codec(codec);
+  context->linesize = linesize_for_codec(codec, 3);
+  context->rgb_buffer = rgb_buffer_for_codec(codec, 3);
   return context;
 }
 

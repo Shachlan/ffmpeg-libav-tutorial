@@ -1,0 +1,19 @@
+{
+  "configurations": [
+    {
+      "name": "Mac",
+      "includePath": [
+        "${workspaceFolder}/src/**",
+        "${workspaceFolder}/third_party/**"
+      ],
+      "defines": [],
+      "macFrameworkPath": ["/System/Library/Frameworks", "/Library/Frameworks"],
+      "intelliSenseMode": "clang-x64",
+      "compilerPath": "/usr/bin/clang",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "forcedInclude": ["${workspaceFolder}/src/all.hpp"]
+    }
+  ],
+  "version": 4
+}

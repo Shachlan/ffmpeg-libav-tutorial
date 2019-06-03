@@ -1,11 +1,10 @@
-#include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "./openGLShading.hpp"
 #include "WREDecoders.hpp"
 #include "WREEncoder.hpp"
+#include "openGLShading.hpp"
 extern "C" {
 #include <libavutil/log.h>
 }
@@ -13,24 +12,6 @@ extern "C" {
 #include <OpenGL/gl3.h>
 
 #define FRONTEND 0;
-
-// static void invert_single_frame(WREVideoDecoder *decoder, WREEncoder *encoder, uint32_t
-// textureID) {
-//   loadTexture(textureID, decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
-//   invertFrame(textureID);
-//   getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
-// }
-
-// static void blend_frames(WREVideoDecoder *decoder, WREVideoDecoder *secondary_decoder,
-//                          WREEncoder *encoder, uint32_t texture1ID, uint32_t texture2ID,
-//                          float blend_ratio) {
-//   loadTexture(texture1ID, decoder->get_width(), decoder->get_height(),
-//   decoder->get_rgb_buffer()); loadTexture(texture2ID, secondary_decoder->get_width(),
-//   secondary_decoder->get_height(),
-//               secondary_decoder->get_rgb_buffer());
-//   blendFrames(texture1ID, texture2ID, blend_ratio);
-//   getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
-// }
 
 int main(int argc, char *argv[]) {
   try {
@@ -63,49 +44,24 @@ int main(int argc, char *argv[]) {
     WREEncoder *encoder = new WREEncoder(argv[3], "libx264", width, height, expected_framerate,
                                          audio_decoder->get_transcoding_components());
 
-    log_info("next");
-    int wait = atoi(argv[5]);
-    int length = atoi(argv[6]);
-
-    setupOpenGL(width, height, NULL);
+    setupOpenGL(width, height);
 
     double source_time_base = decoder->get_time_base();
-    double duration_in_seconds = secondary_decoder->get_duration();
-    double maxTime = (length > duration_in_seconds ? duration_in_seconds : length) + wait;
-    printf("duration: %lf, max time: %lf, wait: %d\n", duration_in_seconds, maxTime, wait);
-    int response;
 
-    long counted_frames = 0;
-    long blended_frames = 0;
-    long inverted_frames = 0;
-    long audio_frames = 0;
-
-    auto primary_texture = -1;
-    auto secondary_texture = -1;
+    auto primary_texture = get_texture();
 
     while (decoder->decode_next_frame() >= 0) {
-      counted_frames++;
-      glClearColor(0, 0, 0, 0);
-      glClear(GL_COLOR_BUFFER_BIT);
-      auto rendererd_text =
-          render_lottie(decoder->get_current_timestamp() * decoder->get_time_base());
-      if (primary_texture == -1) {
-        primary_texture =
-            loadTexture(decoder->get_width(), decoder->get_height(), decoder->get_rgb_buffer());
-      } else {
-        loadTexture(primary_texture, decoder->get_width(), decoder->get_height(),
-                    decoder->get_rgb_buffer());
-      }
+      auto rendererd_text = render_lottie(0.1);
+      loadTexture(primary_texture, decoder->get_width(), decoder->get_height(),
+                  decoder->get_rgb_buffer());
 
       blendFrames(rendererd_text, primary_texture, 0.5);
       getCurrentResults(encoder->get_width(), encoder->get_height(), encoder->get_rgb_buffer());
       encoder->encode_video_frame(source_time_base, decoder->get_current_timestamp());
     }
-    release_texture(primary_texture);
 
     double audio_time_base = audio_decoder->get_time_base();
     while (audio_decoder->decode_next_frame() == 0) {
-      audio_frames++;
       if (encoder->encode_audio_frame(audio_time_base, audio_decoder->get_current_timestamp()) !=
           0) {
         log_error("audio encoding error");
@@ -113,9 +69,6 @@ int main(int argc, char *argv[]) {
     }
 
     encoder->finish_encoding();
-
-    log_info("wrote %lu frames. %lu blended, %lu inverted, %lu audio", counted_frames,
-             blended_frames, inverted_frames, audio_frames);
 
     log_debug("releasing all the resources");
 
