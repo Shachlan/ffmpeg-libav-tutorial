@@ -29,9 +29,15 @@ static string error_description(GLenum error_code) {
 }
 
 static string error_descriptions(vector<GLenum> error_codes) {
-  string error_descriptions = " Errors: ";
+  bool first = true;
+  string error_descriptions = "\nErrors: ";
   for (auto &error_code : error_codes) {
-    error_descriptions += error_description(error_code) + ",";
+    if (first) {
+      first = false;
+    } else {
+      error_descriptions += ", ";
+    }
+    error_descriptions += error_description(error_code);
   }
 
   return error_descriptions;
@@ -66,7 +72,6 @@ static vector<GLenum> get_openGL_errors() {
 void check_gl_errors(string format, ...) {
   auto errors = get_openGL_errors();
   if (errors.size() == 0) {
-    // log_info("%s passed", format.c_str());
     return;
   }
 
