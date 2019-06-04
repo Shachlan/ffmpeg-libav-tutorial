@@ -12,7 +12,7 @@ make-folder:
 ./build/libskia.a: 
 	cd third_party/skia/ &&\
 	python2 tools/git-sync-deps &&\
-	bin/gn gen out/skia/  --args='cc="clang" cxx="clang++" is_official_build=true skia_use_system_libjpeg_turbo=false skia_use_system_harfbuzz=false skia_use_system_libwebp=false skia_use_system_icu=false skia_use_freetype=true skia_use_system_freetype2=true skia_use_dng_sdk=false' &&\
+	bin/gn gen out/skia/  --args='cc="clang" cxx="clang++" is_official_build=true skia_use_system_libjpeg_turbo=false skia_use_system_harfbuzz=false skia_use_system_libwebp=false skia_use_system_icu=false skia_use_freetype=true skia_use_system_freetype2=true skia_use_dng_sdk=false skia_enable_gpu=true' &&\
 	ninja -C out/skia/ &&\
 	cp ./out/skia/*.a ./../../build/
 
