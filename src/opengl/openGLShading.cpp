@@ -14,6 +14,7 @@ extern "C" {
 #else
 
 #include <GLFW/glfw3.h>
+#include <GrContext.h>
 #include <OpenGL/gl3.h>
 
 #include <stdio.h>
@@ -23,31 +24,24 @@ extern "C" {
 
 #endif
 
+#include <SkFont.h>
+#include <SkGraphics.h>
+#include <SkTextBlob.h>
+#include <SkTypeface.h>
 #include <math.h>
+#include <modules/skottie/include/Skottie.h>
+#include <src/core/SkMakeUnique.h>
+#include <src/core/SkOSFile.h>
 #include <src/gpu/gl/GrGlDefines.h>
+#include <src/utils/SkOSPath.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fstream>
 #include <sstream>
+
 #include "GLException.hpp"
-#include "GrContext.h"
 #include "ProgramPool.hpp"
-#include "SkData.h"
-#include "SkFont.h"
-#include "SkGraphics.h"
-#include "SkImage.h"
-#include "SkPaint.h"
-#include "SkPictureRecorder.h"
-#include "SkStream.h"
-#include "SkString.h"
-#include "SkSurface.h"
-#include "SkTextBlob.h"
-#include "SkTypeface.h"
-#include "gl/GrGLInterface.h"
-#include "modules/skottie/include/Skottie.h"
-#include "src/core/SkMakeUnique.h"
-#include "src/core/SkOSFile.h"
-#include "src/utils/SkOSPath.h"
+#include "SkiaWrappers/SkiaUtils.hpp"
 
 using namespace WREOpenGL;
 
@@ -149,23 +143,6 @@ ProgramInfo build_blend_program() {
   return (ProgramInfo){position_buffer, texture_buffer, vertex_array};
 }
 
-static sk_sp<SkSurface> create_surface(int width, int height, GLuint texture_name) {
-  glBindTexture(GL_TEXTURE_2D, texture_name);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  GrGLTextureInfo texture_info = {
-      .fID = texture_name, .fTarget = GL_TEXTURE_2D, .fFormat = GR_GL_RGBA8};
-  GrBackendTexture texture(width, height, GrMipMapped::kNo, texture_info);
-  auto surface =
-      sk_sp(SkSurface::MakeFromBackendTexture(skiaContext.get(), texture, kTopLeft_GrSurfaceOrigin,
-                                              0, kRGBA_8888_SkColorType, nullptr, nullptr));
-  if (!surface) {
-    printf("SkSurface::MakeRenderTarget returned null\n");
-    exit(1);
-  }
-
-  return surface;
-}
-
 void setupOpenGL(int width, int height, char *canvasName) {
 #if FRONTEND == 1
   EmscriptenWebGLContextAttributes attrs;
@@ -204,8 +181,8 @@ void setupOpenGL(int width, int height, char *canvasName) {
   skiaContext = GrContext::MakeGL();
   backend_texture = get_texture();
   lottie_texture = get_texture();
-  surface = create_surface(width, height, backend_texture);
-  lottie_surface = create_surface(width, height, lottie_texture);
+  surface = create_surface(width, height, backend_texture, skiaContext);
+  lottie_surface = create_surface(width, height, lottie_texture, skiaContext);
 
   SkAutoGraphics ag;
 
