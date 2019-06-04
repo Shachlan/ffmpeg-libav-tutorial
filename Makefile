@@ -19,11 +19,13 @@ make-folder:
 copy-fonts:
 	cp -r ./fonts/* ./build/fonts
 
-transcoding: make-folder copy-fonts ./build/libskia.a 
+./build/all.hpp.pch: ./src/all.hpp
+	clang++ -g -Wall -std=c++17 ./src/all.hpp -x c++-header -o $@
+
+transcoding: make-folder ./build/all.hpp.pch copy-fonts ./build/libskia.a 
 	cp data.json ./build/ &&\
 	cp ./src/opengl/shaders/* ./build/ &&\
-	clang++ -g -Wall -std=c++17 ./src/all.hpp -o ./build/all.hpp.gch \
-	&& clang++ -g -std=c++17 -Wall -o build/transcoding \
+	clang++ -g -std=c++17 -Wall -o build/transcoding \
 	-lboost_date_time -lavformat -lavcodec -lswscale -lz -lglfw -lavutil -framework OpenGL \
 	./src/*.cpp ./src/opengl/*.cpp ./src/transcoding/*.cpp \
 	./build/*.a $(SKIA_LIBS) \
