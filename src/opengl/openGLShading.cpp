@@ -1,7 +1,28 @@
 #include "openGLShading.hpp"
 
+#if FRONTEND == 1
+#include <emscripten.h>
+extern "C" {
+#include "html5.h"
+}
+#include <EGL/egl.h>
+#include <GLES2/gl2.h>
+#include <GLES3/gl3.h>
+
+#define PIXEL_FORMAT GL_RGBA
+
+#else
+
 #include <GLFW/glfw3.h>
 #include <OpenGL/gl3.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#define PIXEL_FORMAT GL_RGB
+
+#endif
+
 #include <math.h>
 #include <src/gpu/gl/GrGlDefines.h>
 #include <stdio.h>
@@ -45,13 +66,25 @@ typedef struct {
 } ProgramInfo;
 
 ProgramInfo blend_program;
+#if FRONTEND == 0
 GLFWwindow *window;
+#endif
+
 GLuint vertex_array;
 static sk_sp<SkTypeface> typeface;
 static sk_sp<skottie::Animation> anim;
 
+#if FRONTEND == 1
+
+static const float position[12] = {-1.0f, 1.0f,  1.0f, 1.0f, -1.0f, -1.0f,
+                                   -1.0f, -1.0f, 1.0f, 1.0f, 1.0f,  -1.0f};
+
+#else
+
 static const float position[12] = {-1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f,
                                    -1.0f, 1.0f,  1.0f, -1.0f, 1.0f,  1.0f};
+
+#endif
 
 static const float textureCoords[12] = {0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
                                         0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f};
@@ -133,7 +166,22 @@ static sk_sp<SkSurface> create_surface(int width, int height, GLuint texture_nam
   return surface;
 }
 
-void setupOpenGL(int width, int height) {
+void setupOpenGL(int width, int height, char *canvasName) {
+#if FRONTEND == 1
+  EmscriptenWebGLContextAttributes attrs;
+  attrs.explicitSwapControl = 0;
+  attrs.depth = 1;
+  attrs.stencil = 1;
+  attrs.antialias = 1;
+  attrs.majorVersion = 1;
+  attrs.minorVersion = 0;
+  attrs.enableExtensionsByDefault = true;
+
+  int emscripten_context = emscripten_webgl_create_context(canvasName, &attrs);
+  emscripten_webgl_make_context_current(emscripten_context);
+
+#else
+
   if (!glfwInit()) {
     exit(1);
   }
@@ -148,6 +196,7 @@ void setupOpenGL(int width, int height) {
     exit(1);
   }
   glfwMakeContextCurrent(window);
+#endif
 
   glViewport(0, 0, width, height);
   blend_program = build_blend_program();
@@ -168,7 +217,8 @@ void setupOpenGL(int width, int height) {
 void loadTexture(uint32_t texture_name, int width, int height, const uint8_t *buffer) {
   glActiveTexture(GL_TEXTURE0 + texture_name);
   glBindTexture(GL_TEXTURE_2D, texture_name);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, buffer);
+  glTexImage2D(GL_TEXTURE_2D, 0, PIXEL_FORMAT, width, height, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE,
+               buffer);
 }
 
 void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
@@ -194,7 +244,7 @@ void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
 
 void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
   glBindVertexArray(0);
-  glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, outputBuffer);
+  glReadPixels(0, 0, width, height, PIXEL_FORMAT, GL_UNSIGNED_BYTE, outputBuffer);
 }
 
 uint32_t render_text(string text) {

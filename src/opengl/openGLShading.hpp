@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-void setupOpenGL(int width, int height);
+void setupOpenGL(int width, int height, char *canvasName);
 
 void invertFrame(uint32_t textureID);
 

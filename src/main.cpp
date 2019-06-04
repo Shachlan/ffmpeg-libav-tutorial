@@ -34,20 +34,22 @@ int main(int argc, char *argv[]) {
     auto encoder = Encoder(argv[3], "libx264", width, height, expected_framerate,
                            audio_decoder.get_transcoding_components());
 
-    setupOpenGL(width, height);
+    setupOpenGL(width, height, NULL);
 
     double source_time_base = decoder.get_time_base();
 
     auto primary_texture = get_texture();
 
     while (decoder.decode_next_frame() >= 0) {
-      auto rendererd_text =
-          render_lottie(decoder.get_current_timestamp() * decoder.get_time_base());
+      auto rendered_text =
+          render_text("hello world" +
+                      std::to_string(decoder.get_current_timestamp() * decoder.get_time_base()));
+      // render_lottie(decoder.get_current_timestamp() * decoder.get_time_base());
       decoder.read_from_rgb_buffer([&](const uint8_t *buffer) {
         loadTexture(primary_texture, decoder.get_width(), decoder.get_height(), buffer);
       });
 
-      blendFrames(rendererd_text, primary_texture, 0.5);
+      blendFrames(rendered_text, primary_texture, 0.5);
 
       encoder.write_to_rgb_buffer([&](uint8_t *buffer) {
         getCurrentResults(encoder.get_width(), encoder.get_height(), buffer);
