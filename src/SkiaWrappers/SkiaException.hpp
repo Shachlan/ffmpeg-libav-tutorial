@@ -1,3 +1,5 @@
+
+namespace WRESkiaRendering {
 class SkiaException : std::exception {
 public:
   SkiaException(string message) {
@@ -12,3 +14,4 @@ public:
   /// Description of the error that caused the exception.
   string full_description;
 };
+}  // namespace WRESkiaRendering

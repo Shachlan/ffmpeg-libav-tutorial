@@ -1,17 +1,18 @@
-#include "SkiaUtils.hpp"
+#include "SkiaSurface.hpp"
 
+#include <GrContext.h>
 #include <OpenGL/gl3.h>
 #include <SkRefCnt.h>
+#include <SkSurface.h>
 #include <gpu/GrBackendSurface.h>
-#include <gpu/gl/GrGLTypes.h>
 #include <src/gpu/gl/GrGLDefines.h>
 
 #include "SkiaException.hpp"
 
 using namespace WRESkiaRendering;
 
-sk_sp<SkSurface> create_surface(int width, int height, GLuint texture_name,
-                                sk_sp<GrContext> skia_context) {
+static sk_sp<SkSurface> create_surface2(int width, int height, GLuint texture_name,
+                                        sk_sp<GrContext> skia_context) {
   glBindTexture(GL_TEXTURE_2D, texture_name);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
   GrGLTextureInfo texture_info = {
@@ -25,4 +26,23 @@ sk_sp<SkSurface> create_surface(int width, int height, GLuint texture_name,
   }
 
   return surface;
+}
+
+class SkiaSurface::Impl {
+public:
+  Impl(int width, int height, uint32_t texture_name, sk_sp<GrContext> skia_context)
+      : texture_name(texture_name),
+        skia_surface(create_surface2(width, height, texture_name, skia_context)) {
+  }
+
+  const GLuint texture_name;
+
+private:
+  const sk_sp<SkSurface> skia_surface;
+};
+
+SkiaSurface::SkiaSurface(int width, int height, uint32_t texture_name,
+                         sk_sp<GrContext> skia_context)
+    : implementation(
+          std::make_unique<SkiaSurface::Impl>(width, height, texture_name, skia_context)) {
 }
