@@ -1,4 +1,4 @@
-#include "SkiaSurfacePool.hpp"
+#include "SurfacePool.hpp"
 
 #include <GrContext.h>
 #include <OpenGL/gl3.h>
@@ -11,8 +11,9 @@
 
 using namespace WRESkiaRendering;
 
-static sk_sp<SkSurface> create_surface2(int width, int height, GLuint texture_name,
-                                        sk_sp<GrContext> skia_context) {
+static sk_sp<SkSurface> create_surface(int width, int height, GLuint texture_name,
+                                       sk_sp<GrContext> skia_context) {
+  log_info("creating surface with texture %u", texture_name);
   glBindTexture(GL_TEXTURE_2D, texture_name);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
   GrGLTextureInfo texture_info = {
@@ -28,28 +29,28 @@ static sk_sp<SkSurface> create_surface2(int width, int height, GLuint texture_na
   return surface;
 }
 
-SkiaSurfacePool::SkiaSurfacePool(sk_sp<GrContext> context,
-                                 std::shared_ptr<TexturePool> texture_pool, int surface_width,
-                                 int surface_height)
+SurfacePool::SurfacePool(sk_sp<GrContext> context,
+                         std::shared_ptr<WREOpenGL::TexturePool> texture_pool, int surface_width,
+                         int surface_height)
     : context(context),
       texture_pool(texture_pool),
       surface_width(surface_width),
       surface_height(surface_height) {
 }
 
-sk_sp<SkSurface> SkiaSurfacePool::get_surface() {
-  sk_sp<SkSurface> surface;
+SkiaSurface SurfacePool::get_surface() {
+  SkiaSurface surface;
   if (this->available_surfaces.empty()) {
-    surface = create_surface2(surface_width, surface_height, texture_pool->get_texture(), context);
+    auto texture_name = texture_pool->get_texture();
+    surface = SkiaSurface(texture_name,
+                          create_surface(surface_width, surface_height, texture_name, context));
   } else {
     auto begin_iter = this->available_surfaces.begin();
     surface = *begin_iter;
     this->available_surfaces.erase(begin_iter);
   }
 
-  if (surface != nullptr) {
-    used_surfaces.append_back(surface);
-  }
+  used_surfaces.insert(used_surfaces.begin(), surface);
 
   return surface;
 }

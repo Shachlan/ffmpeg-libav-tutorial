@@ -26,6 +26,7 @@ extern "C" {
 
 #include <SkFont.h>
 #include <SkGraphics.h>
+#include <SkSurface.h>
 #include <SkTextBlob.h>
 #include <SkTypeface.h>
 #include <math.h>
@@ -41,18 +42,19 @@ extern "C" {
 
 #include "GLException.hpp"
 #include "ProgramPool.hpp"
-#include "SkiaWrappers/SkiaUtils.hpp"
 #include "TexturePool.hpp"
 
+#include "SkiaWrappers/SurfacePool.hpp"
+
 using namespace WREOpenGL;
+using WRESkiaRendering::SurfacePool;
 
 static ProgramPool program_pool;
 
 static sk_sp<GrContext> skiaContext;
-static sk_sp<SkSurface> surface;
-static sk_sp<SkSurface> lottie_surface;
-GLuint backend_texture;
-GLuint lottie_texture;
+static WRESkiaRendering::SkiaSurface text_surface;
+static WRESkiaRendering::SkiaSurface lottie_surface;
+static SurfacePool *surface_pool;
 
 typedef struct {
   GLuint position_buffer;
@@ -171,10 +173,11 @@ void setupOpenGL(int width, int height, char *canvasName) {
   blend_program = build_blend_program();
 
   skiaContext = GrContext::MakeGL();
-  backend_texture = get_texture();
-  lottie_texture = get_texture();
-  surface = create_surface(width, height, backend_texture, skiaContext);
-  lottie_surface = create_surface(width, height, lottie_texture, skiaContext);
+  surface_pool = new SurfacePool(skiaContext, texture_pool, width, height);
+  text_surface = surface_pool->get_surface();
+  lottie_surface = surface_pool->get_surface();
+  log_info("textures: %u, %u", text_surface.backing_texture_name,
+           lottie_surface.backing_texture_name);
 
   SkAutoGraphics ag;
 
@@ -191,6 +194,7 @@ void loadTexture(uint32_t texture_name, int width, int height, const uint8_t *bu
 }
 
 void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
+  // log_debug("start blend");
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glClearColor(0, 0, 0, 0);
   glClear(GL_COLOR_BUFFER_BIT);
@@ -209,6 +213,7 @@ void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
   glUniform1i(glGetUniformLocation(program, "tex2"), texture2ID);
 
   glDrawArrays(GL_TRIANGLES, 0, 6);
+  // log_debug("end blend");
 }
 
 void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
@@ -217,9 +222,12 @@ void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
 }
 
 uint32_t render_text(string text) {
+  // log_debug("start render text with texture %u", text_surface.backing_texture_name);
   glBindVertexArray(0);
   skiaContext->resetContext();
-  auto canvas = surface->getCanvas();
+  // log_debug("reset context");
+  auto canvas = text_surface.surface->getCanvas();
+  // log_debug("get canvas");
   canvas->clear(SkColorSetARGB(255, 0, 0, 0));
   auto text_color = SkColor4f::FromColor(SkColorSetARGB(255, 0, 0, 255));
   SkPaint paint2(text_color);
@@ -232,7 +240,8 @@ uint32_t render_text(string text) {
   canvas->drawTextBlob(text_blob.get(), 20, 20, paint2);
   canvas->flush();
 
-  return backend_texture;
+  // log_debug("end render text");
+  return text_surface.backing_texture_name;
 }
 
 void tearDownOpenGL() {
@@ -243,6 +252,7 @@ void tearDownOpenGL() {
 }
 
 uint32_t render_lottie(double time) {
+  // log_debug("start render lottie");
   double intpart;
 
   auto fractpart = modf(time, &intpart);
@@ -250,7 +260,7 @@ uint32_t render_lottie(double time) {
   glBindVertexArray(0);
   skiaContext->resetContext();
 
-  auto canvas = lottie_surface->getCanvas();
+  auto canvas = lottie_surface.surface->getCanvas();
 
   {
     SkAutoCanvasRestore acr(canvas, true);
@@ -265,5 +275,6 @@ uint32_t render_lottie(double time) {
     canvas->flush();
   }
 
-  return lottie_texture;
+  // log_debug("end render text");
+  return lottie_surface.backing_texture_name;
 }
