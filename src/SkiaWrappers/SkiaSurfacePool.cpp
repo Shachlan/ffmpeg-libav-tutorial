@@ -28,11 +28,28 @@ static sk_sp<SkSurface> create_surface2(int width, int height, GLuint texture_na
   return surface;
 }
 
-SkiaSurfacePool::SkiaSurfacePool(std::shared_ptr<TexturePool> texture_pool, int surface_width,
+SkiaSurfacePool::SkiaSurfacePool(sk_sp<GrContext> context,
+                                 std::shared_ptr<TexturePool> texture_pool, int surface_width,
                                  int surface_height)
-    : texture_pool(texture_pool), surface_width(surface_width), surface_height(surface_height) {
+    : context(context),
+      texture_pool(texture_pool),
+      surface_width(surface_width),
+      surface_height(surface_height) {
 }
 
 sk_sp<SkSurface> SkiaSurfacePool::get_surface() {
-  return nullptr;
+  sk_sp<SkSurface> surface;
+  if (this->available_surfaces.empty()) {
+    surface = create_surface2(surface_width, surface_height, texture_pool->get_texture(), context);
+  } else {
+    auto begin_iter = this->available_surfaces.begin();
+    surface = *begin_iter;
+    this->available_surfaces.erase(begin_iter);
+  }
+
+  if (surface != nullptr) {
+    used_surfaces.append_back(surface);
+  }
+
+  return surface;
 }

@@ -5,18 +5,21 @@
 
 class TexturePool;
 class SkSurface;
+class GrContext;
 
 namespace WRESkiaRendering {
 class SkiaSurfacePool {
 public:
-  SkiaSurfacePool(std::shared_ptr<TexturePool> texture_pool, int surface_width, int surface_height);
+  SkiaSurfacePool(sk_sp<GrContext> context, std::shared_ptr<TexturePool> texture_pool,
+                  int surface_width, int surface_height);
   sk_sp<SkSurface> get_surface();
 
 private:
-  std::shared_ptr<TexturePool> texture_pool;
-  int surface_width;
-  int surface_height;
+  const sk_sp<GrContext> context;
+  const std::shared_ptr<TexturePool> texture_pool;
+  const int surface_width;
+  const int surface_height;
   std::vector<sk_sp<SkSurface>> available_surfaces;
-  std::vector<sk_sp<SkSurface>> using_surfaces;
+  std::vector<sk_sp<SkSurface>> used_surfaces;
 };
 }  // namespace WRESkiaRendering
