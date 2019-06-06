@@ -7,6 +7,10 @@
 
 using namespace WREOpenGL;
 
+TexturePool::~TexturePool() {
+  clear();
+}
+
 GLuint create_texture() {
   log_info("create texture");
   GLuint textureLoc;

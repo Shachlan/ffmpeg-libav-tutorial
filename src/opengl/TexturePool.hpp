@@ -6,6 +6,7 @@
 namespace WREOpenGL {
 class TexturePool {
 public:
+  ~TexturePool();
   uint32_t get_texture();
   void release_texture(uint32_t name);
   void flush();

@@ -42,6 +42,7 @@ extern "C" {
 #include "GLException.hpp"
 #include "ProgramPool.hpp"
 #include "SkiaWrappers/SkiaUtils.hpp"
+#include "TexturePool.hpp"
 
 using namespace WREOpenGL;
 
@@ -67,6 +68,7 @@ GLFWwindow *window;
 GLuint vertex_array;
 static sk_sp<SkTypeface> typeface;
 static sk_sp<skottie::Animation> anim;
+static std::shared_ptr<TexturePool> texture_pool = std::make_shared<TexturePool>();
 
 #if FRONTEND == 1
 
@@ -84,17 +86,7 @@ static const float textureCoords[12] = {0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
                                         0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f};
 
 GLuint get_texture() {
-  GLuint textureLoc;
-  glGenTextures(1, &textureLoc);
-  glActiveTexture(GL_TEXTURE0 + textureLoc);
-
-  glBindTexture(GL_TEXTURE_2D, textureLoc);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glBindTexture(GL_TEXTURE_2D, 0);
-  return textureLoc;
+  return texture_pool->get_texture();
 }
 
 static GLuint generate_vertex_array() {

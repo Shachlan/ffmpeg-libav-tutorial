@@ -1,13 +1,13 @@
-#include "SkiaSurface.hpp"
+#include "SkiaSurfacePool.hpp"
 
 #include <GrContext.h>
 #include <OpenGL/gl3.h>
-#include <SkRefCnt.h>
 #include <SkSurface.h>
 #include <gpu/GrBackendSurface.h>
 #include <src/gpu/gl/GrGLDefines.h>
 
 #include "SkiaException.hpp"
+#include "opengl/TexturePool.hpp"
 
 using namespace WRESkiaRendering;
 
@@ -28,21 +28,11 @@ static sk_sp<SkSurface> create_surface2(int width, int height, GLuint texture_na
   return surface;
 }
 
-class SkiaSurface::Impl {
-public:
-  Impl(int width, int height, uint32_t texture_name, sk_sp<GrContext> skia_context)
-      : texture_name(texture_name),
-        skia_surface(create_surface2(width, height, texture_name, skia_context)) {
-  }
+SkiaSurfacePool::SkiaSurfacePool(std::shared_ptr<TexturePool> texture_pool, int surface_width,
+                                 int surface_height)
+    : texture_pool(texture_pool), surface_width(surface_width), surface_height(surface_height) {
+}
 
-  const GLuint texture_name;
-
-private:
-  const sk_sp<SkSurface> skia_surface;
-};
-
-SkiaSurface::SkiaSurface(int width, int height, uint32_t texture_name,
-                         sk_sp<GrContext> skia_context)
-    : implementation(
-          std::make_unique<SkiaSurface::Impl>(width, height, texture_name, skia_context)) {
+sk_sp<SkSurface> SkiaSurfacePool::get_surface() {
+  return nullptr;
 }
