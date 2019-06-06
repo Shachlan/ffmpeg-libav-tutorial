@@ -42,6 +42,7 @@ extern "C" {
 
 #include "GLException.hpp"
 #include "ProgramPool.hpp"
+#include "SkiaWrappers/TypefaceFactory.hpp"
 #include "TexturePool.hpp"
 
 #include "SkiaWrappers/SurfacePool.hpp"
@@ -55,6 +56,7 @@ static sk_sp<GrContext> skiaContext;
 static WRESkiaRendering::SkiaSurface text_surface;
 static WRESkiaRendering::SkiaSurface lottie_surface;
 static SurfacePool *surface_pool;
+static WRESkiaRendering::TypefaceFactory typeface_factory;
 
 typedef struct {
   GLuint position_buffer;
@@ -68,7 +70,6 @@ GLFWwindow *window;
 #endif
 
 GLuint vertex_array;
-static sk_sp<SkTypeface> typeface;
 static sk_sp<skottie::Animation> anim;
 static std::shared_ptr<TexturePool> texture_pool = std::make_shared<TexturePool>();
 
@@ -182,8 +183,6 @@ void setupOpenGL(int width, int height, char *canvasName) {
   SkAutoGraphics ag;
 
   anim = skottie::Animation::Builder().makeFromFile("data.json");
-
-  typeface = SkTypeface::MakeFromFile("./fonts/pacifico/Pacifico.ttf");
 }
 
 void loadTexture(uint32_t texture_name, int width, int height, const uint8_t *buffer) {
@@ -231,6 +230,7 @@ uint32_t render_text(string text) {
   canvas->clear(SkColorSetARGB(255, 0, 0, 0));
   auto text_color = SkColor4f::FromColor(SkColorSetARGB(255, 0, 0, 255));
   SkPaint paint2(text_color);
+  auto typeface = typeface_factory.get_typeface("./fonts/pacifico/Pacifico.ttf");
   if (typeface == nullptr) {
     printf("no typeface\n");
     exit(1);
