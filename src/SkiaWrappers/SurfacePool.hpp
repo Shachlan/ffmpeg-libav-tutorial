@@ -11,9 +11,7 @@ class GrContext;
 
 namespace WRESkiaRendering {
 struct SkiaSurface {
-  SkiaSurface(uint32_t texture_name, sk_sp<SkSurface> surface)
-      : backing_texture_name(texture_name), surface(surface) {
-  }
+  SkiaSurface(uint32_t texture_name, sk_sp<SkSurface> surface);
   SkiaSurface() = default;
 
   uint32_t backing_texture_name;

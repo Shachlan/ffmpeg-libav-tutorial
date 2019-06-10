@@ -11,6 +11,10 @@
 
 using namespace WRESkiaRendering;
 
+SkiaSurface::SkiaSurface(uint32_t texture_name, sk_sp<SkSurface> surface)
+    : backing_texture_name(texture_name), surface(surface) {
+}
+
 static sk_sp<SkSurface> create_surface(int width, int height, GLuint texture_name,
                                        sk_sp<GrContext> skia_context) {
   log_info("creating surface with texture %u", texture_name);
