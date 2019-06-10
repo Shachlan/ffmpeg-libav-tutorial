@@ -31,6 +31,6 @@ static unique_ptr<Layers> get_layers(json layers_model) {
   return vec;
 }
 
-RenderingModel::RenderingModel(json object) {
+RenderingModel::RenderingModel(json &&object) {
   layers = get_layers(object);
 }

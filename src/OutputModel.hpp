@@ -5,7 +5,7 @@ using std::string;
 
 class OutputModel {
 public:
-  OutputModel(json model);
+  explicit OutputModel(json &&model);
   int width;
   int height;
   string source;

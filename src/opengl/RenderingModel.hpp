@@ -25,7 +25,7 @@ public:
   VideoLayer(string file_name, double expected_framerate, double start_time, double duration,
              double speed_ratio)
       : Layer(Layer::Type::Video),
-        file_name(file_name),
+        file_name(std::move(file_name)),
         expected_framerate(expected_framerate),
         start_time(start_time),
         duration(duration),
@@ -76,8 +76,11 @@ private:
 
 class TextLayer : public Layer {
 public:
-  TextLayer(string text, string font, int font_size)
-      : Layer(Layer::Type::Text), text(text), font(font), font_size(font_size) {
+  TextLayer(string text, string &&font, int font_size)
+      : Layer(Layer::Type::Text),
+        text(std::move(text)),
+        font(std::move(font)),
+        font_size(font_size) {
   }
 
   string get_text() const noexcept {
@@ -100,6 +103,6 @@ private:
 
 class RenderingModel {
 public:
-  RenderingModel(json model);
+  explicit RenderingModel(json &&model);
   unique_ptr<Layers> layers;
 };
