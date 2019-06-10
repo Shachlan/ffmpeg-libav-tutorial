@@ -42,10 +42,9 @@ extern "C" {
 
 #include "GLException.hpp"
 #include "ProgramPool.hpp"
+#include "SkiaWrappers/SurfacePool.hpp"
 #include "SkiaWrappers/TypefaceFactory.hpp"
 #include "TexturePool.hpp"
-
-#include "SkiaWrappers/SurfacePool.hpp"
 
 using namespace WREOpenGL;
 using WRESkiaRendering::SurfacePool;

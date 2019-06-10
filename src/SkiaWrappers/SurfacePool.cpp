@@ -42,19 +42,34 @@ SurfacePool::SurfacePool(sk_sp<GrContext> context,
       surface_height(surface_height) {
 }
 
+SurfacePool::~SurfacePool() {
+  // TODO - release all textures
+}
+
 SkiaSurface SurfacePool::get_surface() {
   SkiaSurface surface;
-  if (this->available_surfaces.empty()) {
+  if (available_surfaces.empty()) {
     auto texture_name = texture_pool->get_texture();
     surface = SkiaSurface(texture_name,
                           create_surface(surface_width, surface_height, texture_name, context));
   } else {
-    auto begin_iter = this->available_surfaces.begin();
+    auto begin_iter = available_surfaces.begin();
     surface = *begin_iter;
-    this->available_surfaces.erase(begin_iter);
+    available_surfaces.erase(begin_iter);
   }
 
   used_surfaces.insert(used_surfaces.begin(), surface);
 
   return surface;
+}
+
+void SurfacePool::release_surface(SkiaSurface surface) {
+  available_surfaces.insert(used_surfaces.begin(), surface);
+
+  for (auto iter = used_surfaces.begin(); iter != used_surfaces.end(); iter++) {
+    if ((*iter).backing_texture_name == surface.backing_texture_name) {
+      used_surfaces.erase(iter);
+      break;
+    }
+  }
 }

@@ -1,5 +1,3 @@
-#include "Rendering/TextRenderer.hpp"
-
 #include <SkRefCnt.h>
 #include <vector>
 
@@ -22,7 +20,9 @@ class SurfacePool {
 public:
   SurfacePool(sk_sp<GrContext> context, std::shared_ptr<WREOpenGL::TexturePool> texture_pool,
               int surface_width, int surface_height);
+  ~SurfacePool();
   SkiaSurface get_surface();
+  void release_surface(SkiaSurface surface);
 
 private:
   const sk_sp<GrContext> context;
