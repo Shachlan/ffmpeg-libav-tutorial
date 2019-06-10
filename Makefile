@@ -30,6 +30,7 @@ transcoding: make-folder ./build/all.hpp.pch copy-fonts ./build/libskia.a
 	./src/*.cpp ./src/opengl/*.cpp ./src/SkiaWrappers/*.cpp ./src/transcoding/*.cpp \
 	./build/*.a $(SKIA_LIBS) \
 	 -I./src/ -I./src/opengl/ -I./src/transcoding/ -I./build -I./third_party/skia/include -I./third_party/skia/include/core -I./third_party/skia/include/gpu -I./third_party/skia/ \
+	 -I./third_party/nlohmann-json/include/ \
 	 -include all.hpp -stdlib=libc++ -DGL_SILENCE_DEPRECATION=1 -DDEBUG=1 &&\
 	 cd ./build &&\
 	 ./transcoding ./../movies/small_bunny_1080p_60fps.mp4 ./../movies/dog.mp4  ./../movies/bunny_2s_gop.mp4 0.5 2 4
