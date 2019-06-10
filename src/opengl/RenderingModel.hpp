@@ -1,28 +1,30 @@
 #include <vector>
 
-using std::string_view;
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+
+using std::string;
 
 class Layer {
 public:
-  constexpr Layer(string_view type) : type(type) {
+  enum class Type { Video, Text, Texture };
+  constexpr Layer(Type type) : type(type) {
   }
 
-  constexpr string_view get_type() const noexcept {
+  constexpr Type get_type() const noexcept {
     return type;
   }
 
 private:
-  string_view type;
+  Type type;
 };
 using Layers = std::vector<shared_ptr<Layer>>;
 
 class VideoLayer : public Layer {
 public:
-  static constexpr string_view Type = "video";
-
-  constexpr VideoLayer(string_view file_name, double expected_framerate, double start_time,
-                       double duration, double speed_ratio)
-      : Layer(Type),
+  VideoLayer(string file_name, double expected_framerate, double start_time, double duration,
+             double speed_ratio)
+      : Layer(Layer::Type::Video),
         file_name(file_name),
         expected_framerate(expected_framerate),
         start_time(start_time),
@@ -30,7 +32,7 @@ public:
         speed_ratio(speed_ratio) {
   }
 
-  constexpr string_view get_file_name() const noexcept {
+  string get_file_name() const noexcept {
     return file_name;
   }
 
@@ -51,7 +53,7 @@ public:
   }
 
 private:
-  string_view file_name;
+  string file_name;
   double expected_framerate;
   double start_time;
   double duration;
@@ -60,9 +62,8 @@ private:
 
 class TextureLayer : public Layer {
 public:
-  static constexpr string_view Type = "texture";
-
-  constexpr TextureLayer(uint32_t source_texture) : Layer(Type), source_texture(source_texture) {
+  constexpr TextureLayer(uint32_t source_texture)
+      : Layer(Layer::Type::Texture), source_texture(source_texture) {
   }
 
   constexpr uint32_t get_source_texture() const noexcept {
@@ -75,17 +76,15 @@ private:
 
 class TextLayer : public Layer {
 public:
-  static constexpr string_view Type = "text";
-
-  constexpr TextLayer(string_view text, string_view font, int font_size)
-      : Layer(Type), text(text), font(font), font_size(font_size) {
+  TextLayer(string text, string font, int font_size)
+      : Layer(Layer::Type::Text), text(text), font(font), font_size(font_size) {
   }
 
-  constexpr string_view get_text() const noexcept {
+  string get_text() const noexcept {
     return text;
   }
 
-  constexpr string_view get_font() const noexcept {
+  string get_font() const noexcept {
     return font;
   }
 
@@ -94,12 +93,13 @@ public:
   }
 
 private:
-  string_view text;
-  string_view font;
+  string text;
+  string font;
   int font_size;
 };
 
 class RenderingModel {
 public:
-  static unique_ptr<Layers> get_layers(string model);
+  RenderingModel(json model);
+  unique_ptr<Layers> layers;
 };

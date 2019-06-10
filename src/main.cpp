@@ -11,27 +11,49 @@ extern "C" {
 
 #include <OpenGL/gl3.h>
 
+#include <fstream>
+#include <sstream>
+#include "OutputModel.hpp"
+#include "opengl/RenderingModel.hpp"
+
 #define FRONTEND 0;
 
 using namespace WRETranscoding;
 
+static json read_file(string file_name) {
+  std::ifstream i(file_name);
+  json j;
+  i >> j;
+  return j;
+}
+
 int main(int argc, char *argv[]) {
+  auto output_model = OutputModel(read_file("output_model.json"));
+  auto render_model = RenderingModel(read_file("render_model.json"));
+
   try {
     av_log_set_level(AV_LOG_FATAL);
     log_debug("start");
-    int height = 1080;
-    int width = 1920;
+    int height = output_model.height;
+    int width = output_model.width;
     auto expected_framerate = 60;
 
-    auto decoder = VideoDecoder(argv[1], expected_framerate, 2, 4, 0.5);
+    auto vector = *(render_model.layers.get());
+    auto base_layer = vector.at(0);
+    shared_ptr<VideoLayer> layer = std::static_pointer_cast<VideoLayer>(base_layer);
+    auto decoder =
+        VideoDecoder(layer->get_file_name(), layer->get_expected_framerate(),
+                     layer->get_start_time(), layer->get_duration(), layer->get_speed_ratio());
 
-    log_info("secondary decoder");
-    auto secondary_decoder = VideoDecoder(argv[2], expected_framerate);
+    // auto decoder = VideoDecoder(argv[1], expected_framerate, 2, 4, 0.5);
+
+    // log_info("secondary decoder");
+    // auto secondary_decoder = VideoDecoder(argv[2], expected_framerate);
 
     log_info("audio decoder");
     auto audio_decoder = AudioDecoder(argv[1], 1, 0);
 
-    auto encoder = Encoder(argv[3], "libx264", width, height, expected_framerate,
+    auto encoder = Encoder(output_model.source, "libx264", width, height, expected_framerate,
                            audio_decoder.get_transcoding_components());
 
     setupOpenGL(width, height, NULL);

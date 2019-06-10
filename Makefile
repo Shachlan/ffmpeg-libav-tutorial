@@ -23,7 +23,7 @@ copy-fonts:
 	clang++ -g -Wall -std=c++17 ./src/all.hpp -x c++-header -o $@
 
 transcoding: make-folder ./build/all.hpp.pch copy-fonts ./build/libskia.a 
-	cp data.json ./build/ &&\
+	cp *.json ./build/ &&\
 	cp ./src/opengl/shaders/* ./build/ &&\
 	clang++ -g -std=c++17 -Wall -o build/transcoding \
 	-lboost_date_time -lavformat -lavcodec -lswscale -lz -lglfw -lavutil -framework OpenGL \
