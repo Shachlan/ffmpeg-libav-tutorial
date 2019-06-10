@@ -2,3 +2,6 @@
 [submodule "third_party/skia"]
 	path = third_party/skia
 url=https://github.com/lightricks/skia
+[submodule "third_party/nlohmann-json"]
+	path = third_party/nlohmann-json
+	url = https://github.com/nlohmann/json
