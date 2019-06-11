@@ -41,9 +41,16 @@ int main(int argc, char *argv[]) {
     auto primary_texture = get_texture();
 
     while (decoder.decode_next_frame() >= 0) {
-      auto rendered_text =
-          render_text("hello world" +
-                      std::to_string(decoder.get_current_timestamp() * decoder.get_time_base()));
+      render_text(
+          "hello world" + std::to_string(decoder.get_current_timestamp() * decoder.get_time_base()),
+          50, 50, 100);
+      render_text(
+          "you know" + std::to_string(decoder.get_current_timestamp() * decoder.get_time_base()),
+          200, 200, 100);
+      auto rendered_text = render_text(
+          "it works" + std::to_string(decoder.get_current_timestamp() * decoder.get_time_base()),
+          300, 300, 100);
+
       // render_lottie(decoder.get_current_timestamp() * decoder.get_time_base());
       decoder.read_from_rgb_buffer([&](const uint8_t *buffer) {
         loadTexture(primary_texture, decoder.get_width(), decoder.get_height(), buffer);

@@ -11,10 +11,6 @@
 
 using namespace WRESkiaRendering;
 
-SkiaSurface::SkiaSurface(uint32_t texture_name, sk_sp<SkSurface> surface)
-    : backing_texture_name(texture_name), surface(surface) {
-}
-
 static sk_sp<SkSurface> create_surface(int width, int height, GLuint texture_name,
                                        sk_sp<GrContext> skia_context) {
   log_info("creating surface with texture %u", texture_name);
@@ -46,30 +42,32 @@ SurfacePool::~SurfacePool() {
   // TODO - release all textures
 }
 
-SkiaSurface SurfacePool::get_surface() {
-  SkiaSurface surface;
+SurfaceInfo SurfacePool::get_surface_info() {
+  SurfaceInfo surface_info;
   if (available_surfaces.empty()) {
     auto texture_name = texture_pool->get_texture();
-    surface = SkiaSurface(texture_name,
-                          create_surface(surface_width, surface_height, texture_name, context));
+    surface_info =
+        SurfaceInfo(texture_name,
+                    create_surface(surface_width, surface_height, texture_name, context), context);
   } else {
     auto begin_iter = available_surfaces.begin();
-    surface = *begin_iter;
+    surface_info = *begin_iter;
     available_surfaces.erase(begin_iter);
   }
 
-  used_surfaces.insert(used_surfaces.begin(), surface);
+  used_surfaces.insert(used_surfaces.begin(), surface_info);
+  auto canvas = surface_info.surface->getCanvas();
+  canvas->clear(SkColorSetARGB(255, 0, 0, 0));
 
-  return surface;
+  return surface_info;
 }
 
-void SurfacePool::release_surface(SkiaSurface surface) {
-  available_surfaces.insert(used_surfaces.begin(), surface);
-
+void SurfacePool::release_surface(SurfaceInfo surface_info) {
   for (auto iter = used_surfaces.begin(); iter != used_surfaces.end(); iter++) {
-    if ((*iter).backing_texture_name == surface.backing_texture_name) {
+    if ((*iter).backing_texture_name == surface_info.backing_texture_name) {
       used_surfaces.erase(iter);
       break;
     }
   }
+  available_surfaces.insert(available_surfaces.begin(), surface_info);
 }

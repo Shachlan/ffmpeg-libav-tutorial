@@ -43,6 +43,7 @@ extern "C" {
 #include "GLException.hpp"
 #include "ProgramPool.hpp"
 #include "SkiaWrappers/SurfacePool.hpp"
+#include "SkiaWrappers/TextRenderer.hpp"
 #include "SkiaWrappers/TypefaceFactory.hpp"
 #include "TexturePool.hpp"
 
@@ -52,10 +53,11 @@ using WRESkiaRendering::SurfacePool;
 static ProgramPool program_pool;
 
 static sk_sp<GrContext> skiaContext;
-static WRESkiaRendering::SkiaSurface text_surface;
-static WRESkiaRendering::SkiaSurface lottie_surface;
+static WRESkiaRendering::SurfaceInfo text_surface;
+static WRESkiaRendering::SurfaceInfo lottie_surface;
 static SurfacePool *surface_pool;
-static WRESkiaRendering::TypefaceFactory typeface_factory;
+static shared_ptr<WRESkiaRendering::TypefaceFactory> typeface_factory =
+    std::make_shared<WRESkiaRendering::TypefaceFactory>();
 
 typedef struct {
   GLuint position_buffer;
@@ -174,8 +176,8 @@ void setupOpenGL(int width, int height, char *canvasName) {
 
   skiaContext = GrContext::MakeGL();
   surface_pool = new SurfacePool(skiaContext, texture_pool, width, height);
-  text_surface = surface_pool->get_surface();
-  lottie_surface = surface_pool->get_surface();
+  text_surface = surface_pool->get_surface_info();
+  lottie_surface = surface_pool->get_surface_info();
   log_info("textures: %u, %u", text_surface.backing_texture_name,
            lottie_surface.backing_texture_name);
 
@@ -217,30 +219,20 @@ void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
 void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
   glBindVertexArray(0);
   glReadPixels(0, 0, width, height, PIXEL_FORMAT, GL_UNSIGNED_BYTE, outputBuffer);
+  surface_pool->release_surface(text_surface);
+  surface_pool->release_surface(lottie_surface);
+  text_surface = surface_pool->get_surface_info();
+  lottie_surface = surface_pool->get_surface_info();
 }
 
-uint32_t render_text(string text) {
-  // log_debug("start render text with texture %u", text_surface.backing_texture_name);
+uint32_t render_text(string text, int xCoord, int yCoord, int font_size) {
   glBindVertexArray(0);
+  auto text_renderer = WRESkiaRendering::TextRenderer(typeface_factory, text_surface);
   skiaContext->resetContext();
-  // log_debug("reset context");
-  auto canvas = text_surface.surface->getCanvas();
-  // log_debug("get canvas");
-  canvas->clear(SkColorSetARGB(255, 0, 0, 0));
-  auto text_color = SkColor4f::FromColor(SkColorSetARGB(255, 0, 0, 255));
-  SkPaint paint2(text_color);
-  auto typeface = typeface_factory.get_typeface("./fonts/pacifico/Pacifico.ttf");
-  if (typeface == nullptr) {
-    printf("no typeface\n");
-    exit(1);
-  }
+  auto configuration = WRESkiaRendering::TextRenderConfiguration{
+      "./fonts/pacifico/Pacifico.ttf", font_size, xCoord, yCoord, {255, 0, 0, 255}};
 
-  auto text_blob = SkTextBlob::MakeFromString(text.c_str(), SkFont(typeface, 30));
-  canvas->drawTextBlob(text_blob.get(), 20, 20, paint2);
-  canvas->flush();
-
-  // log_debug("end render text");
-  return text_surface.backing_texture_name;
+  return text_renderer.render_text(text, configuration);
 }
 
 void tearDownOpenGL() {
