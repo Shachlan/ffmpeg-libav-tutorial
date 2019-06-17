@@ -2,13 +2,13 @@ namespace WRERendering {
 class TextRenderer;
 }
 namespace WREOpenGL {
-class TexturePool;
+class TextureAllocator;
 }
 
 namespace WRESkiaRendering {
 class Context {
 public:
-  Context(shared_ptr<WREOpenGL::TexturePool> texture_pool, int width, int height);
+  Context(shared_ptr<WREOpenGL::TextureAllocator> texture_allocator, int width, int height);
   unique_ptr<WRERendering::TextRenderer> get_text_renderer();
 
 private:

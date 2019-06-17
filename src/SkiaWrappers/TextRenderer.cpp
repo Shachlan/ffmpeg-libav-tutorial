@@ -12,13 +12,14 @@
 
 using WRESkiaRendering::TextRenderer;
 
-TextRenderer::TextRenderer(shared_ptr<TypefaceFactory> typeface_factory, SurfaceInfo surface_info)
-    : surface_info(surface_info), typeface_factory(typeface_factory) {
+TextRenderer::TextRenderer(shared_ptr<TypefaceFactory> typeface_factory,
+                           shared_ptr<SurfaceInfo> surface_info)
+    : surface_info(std::move(surface_info)), typeface_factory(typeface_factory) {
 }
 
 uint32_t TextRenderer::render_text(string text, TextRenderConfiguration configuration) {
-  surface_info.context->resetContext();
-  auto canvas = surface_info.surface->getCanvas();
+  surface_info->context->resetContext();
+  auto canvas = surface_info->surface->getCanvas();
   auto text_color = SkColor4f::FromColor(
       SkColorSetARGB(configuration.text_color[3], configuration.text_color[0],
                      configuration.text_color[1], configuration.text_color[2]));
@@ -33,5 +34,5 @@ uint32_t TextRenderer::render_text(string text, TextRenderConfiguration configur
   canvas->drawTextBlob(text_blob.get(), configuration.xCoord, configuration.yCoord, paint2);
   canvas->flush();
 
-  return surface_info.backing_texture_name;
+  return surface_info->backing_texture->name;
 }

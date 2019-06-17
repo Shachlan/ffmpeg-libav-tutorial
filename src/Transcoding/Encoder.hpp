@@ -64,16 +64,16 @@ public:
 
 private:
   /// Encoder for video frames.
-  std::unique_ptr<TranscodingComponents> video_encoder;
+  unique_ptr<TranscodingComponents> video_encoder;
 
   /// Encoder for audio frames.
-  std::unique_ptr<TranscodingComponents> audio_encoder;
+  unique_ptr<TranscodingComponents> audio_encoder;
 
   /// Wrapper for the encoded file.
   AVFormatContext *format_context;
 
   /// Context for converting RGB frames into the format used by \c video_encoder.
-  std::unique_ptr<VideoFormatConverter> video_conversion_context;
+  unique_ptr<VideoFormatConverter> video_conversion_context;
 };
 
 }  // namespace WRETranscoding

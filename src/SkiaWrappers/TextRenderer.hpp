@@ -13,11 +13,11 @@ struct TextRenderConfiguration {
 
 class TextRenderer {
 public:
-  TextRenderer(shared_ptr<TypefaceFactory> typeface_factory, SurfaceInfo surface_info);
+  TextRenderer(shared_ptr<TypefaceFactory> typeface_factory, shared_ptr<SurfaceInfo> surface_info);
   uint32_t render_text(string text, TextRenderConfiguration configuration);
 
 private:
-  const SurfaceInfo surface_info;
+  const shared_ptr<SurfaceInfo> surface_info;
   const shared_ptr<TypefaceFactory> typeface_factory;
 };
 }  // namespace WRESkiaRendering

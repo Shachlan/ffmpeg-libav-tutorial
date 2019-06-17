@@ -34,7 +34,7 @@ struct Decoder {
 
 protected:
   /// Concrete implementation of the decoding class.
-  std::unique_ptr<DecoderImplementation> decoder_implementation;
+  unique_ptr<DecoderImplementation> decoder_implementation;
 };
 
 /// Decoder of audio streams.
@@ -110,7 +110,7 @@ struct VideoDecoder : Decoder {
 
 private:
   /// Converter between the video's native pixel format and packed RGB format.
-  std::unique_ptr<VideoFormatConverter> video_conversion_context;
+  unique_ptr<VideoFormatConverter> video_conversion_context;
 };
 
 }  // namespace WRETranscoding

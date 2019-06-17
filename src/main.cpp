@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
 
     double source_time_base = decoder.get_time_base();
 
-    auto primary_texture = get_texture();
+    auto primary_texture = get_texture(decoder.get_width(), decoder.get_height());
 
     while (decoder.decode_next_frame() >= 0) {
       render_text(
@@ -52,11 +52,9 @@ int main(int argc, char *argv[]) {
           300, 300, 100);
 
       // render_lottie(decoder.get_current_timestamp() * decoder.get_time_base());
-      decoder.read_from_rgb_buffer([&](const uint8_t *buffer) {
-        loadTexture(primary_texture, decoder.get_width(), decoder.get_height(), buffer);
-      });
+      decoder.read_from_rgb_buffer([&](const uint8_t *buffer) { primary_texture->load(buffer); });
 
-      blendFrames(rendered_text, primary_texture, 0.5);
+      blendFrames(rendered_text, primary_texture->name, 0.5);
 
       encoder.write_to_rgb_buffer([&](uint8_t *buffer) {
         getCurrentResults(encoder.get_width(), encoder.get_height(), buffer);
