@@ -1,5 +1,7 @@
 #include "openGLShading.hpp"
 
+#include "RenderConfiguration.hpp"
+
 #if FRONTEND == 1
 #include <emscripten.h>
 extern "C" {
