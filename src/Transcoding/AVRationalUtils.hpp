@@ -1,3 +1,6 @@
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
+
 extern "C" {
 #include <libavutil/rational.h>
 }

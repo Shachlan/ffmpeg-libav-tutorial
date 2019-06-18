@@ -42,7 +42,7 @@ public:
   /// @note TWriteFunc must take \c uint8_t * as a single argument.
   template <class TWriteFunc>
   decltype(auto) write_to_rgb_buffer(TWriteFunc &&buffer_write) {
-    return video_conversion_context->write_to_rgb_buffer(buffer_write);
+    return video_conversion_context->write_to_rgb_buffer(std::forward<TWriteFunc>(buffer_write));
   }
 
   /// Encodes the information in the internal data buffer as a video frame timestamped as
@@ -64,16 +64,16 @@ public:
 
 private:
   /// Encoder for video frames.
-  std::unique_ptr<TranscodingComponents> video_encoder;
+  unique_ptr<TranscodingComponents> video_encoder;
 
   /// Encoder for audio frames.
-  std::unique_ptr<TranscodingComponents> audio_encoder;
+  unique_ptr<TranscodingComponents> audio_encoder;
 
   /// Wrapper for the encoded file.
   AVFormatContext *format_context;
 
   /// Context for converting RGB frames into the format used by \c video_encoder.
-  std::unique_ptr<VideoFormatConverter> video_conversion_context;
+  unique_ptr<VideoFormatConverter> video_conversion_context;
 };
 
 }  // namespace WRETranscoding

@@ -16,7 +16,7 @@ namespace WRETranscoding {
 
 /// Components needed in order to decode media from a given file using FFmpeg. This struct cleanly
 /// wraps the frame decoding process.
-struct DecoderImplementation : TranscodingComponents {
+struct Decoder::Impl : TranscodingComponents {
   /// Factory method for the creation of audio decoders. Calling this will open an audio decoder
   /// for the file at \c file_name. Will return \c nullptr if file opening failed.
   ///
@@ -33,8 +33,8 @@ struct DecoderImplementation : TranscodingComponents {
   ///
   /// @param speed_ratio - the ratio between the speed of the original stream and of the
   /// decoded frames.
-  DecoderImplementation(string file_name, double start_from, double duration, double speed_ratio,
-                        AVMediaType media_type) {
+  Impl(string file_name, double start_from, double duration, double speed_ratio,
+       AVMediaType media_type) {
     format_context = avformat_alloc_context();
     if (!format_context) {
       throw TranscodingException("could not allocate memory for Format Context");
@@ -54,14 +54,14 @@ struct DecoderImplementation : TranscodingComponents {
       throw TranscodingException("could not get the stream index with error %d", stream_index);
     }
 
-    stream = format_context->streams[stream_index];
-    codec = avcodec_find_decoder(stream->codecpar->codec_id);
-    context = avcodec_alloc_context3(codec);
-    if (avcodec_parameters_to_context(context, stream->codecpar) < 0) {
+    stream = wrap_with_empty_deleter<AVStream>(format_context->streams[stream_index]);
+    codec = wrap_with_empty_deleter<AVCodec>(avcodec_find_decoder(stream->codecpar->codec_id));
+    context = create_codec_context(codec);
+    if (avcodec_parameters_to_context(context.get(), stream->codecpar) < 0) {
       throw TranscodingException("failed to copy codec params to codec context");
     }
 
-    if (avcodec_open2(context, codec, NULL) < 0) {
+    if (avcodec_open2(context.get(), codec.get(), NULL) < 0) {
       throw TranscodingException("failed to open codec through avcodec_open2");
     }
 
@@ -78,23 +78,27 @@ struct DecoderImplementation : TranscodingComponents {
       }
     }
 
-    packet = av_packet_alloc();
-    frame = av_frame_alloc();
+    packet = create_packet();
+    frame = create_frame();
     last_timestamp = (duration * inverted_time_base);
     adjusted_time_base = av_mul_q(stream->time_base, wre_double_to_rational(speed_ratio));
   }
 
-  virtual ~DecoderImplementation() {
+  virtual ~Impl() {
     avformat_close_input(&format_context);
     avformat_free_context(format_context);
+  }
+
+  virtual bool should_log() {
+    return false;
   }
 
   /// Decodes the next frame in the file into the internal \c frame.
   virtual int decode_next_frame() noexcept {
     int result = 0;
     while (result >= 0) {
-      av_frame_unref(frame);
-      result = avcodec_receive_frame(context, frame);
+      av_frame_unref(frame.get());
+      result = avcodec_receive_frame(context.get(), frame.get());
       if (result == 0) {
         if (frame->pts > last_timestamp) {
           return AVERROR_EOF;
@@ -104,6 +108,9 @@ struct DecoderImplementation : TranscodingComponents {
           continue;
         }
 
+        if (should_log()) {
+          log_debug("decoding frame %lu", frame->pts);
+        }
         return 0;
       }
       if (result != AVERROR(EAGAIN)) {
@@ -111,11 +118,11 @@ struct DecoderImplementation : TranscodingComponents {
         return result;
       }
 
-      av_packet_unref(packet);
+      av_packet_unref(packet.get());
       auto packet_to_send = packet;
-      result = av_read_frame(format_context, packet);
+      result = av_read_frame(format_context, packet.get());
       packet->pts -= first_timestamp;
-      av_packet_rescale_ts(packet, stream->time_base, adjusted_time_base);
+      av_packet_rescale_ts(packet.get(), stream->time_base, adjusted_time_base);
       if (result == AVERROR_EOF) {
         // Sending NULL to the codec context enters it into draining mode.
         packet_to_send = NULL;
@@ -124,7 +131,7 @@ struct DecoderImplementation : TranscodingComponents {
         continue;
       }
 
-      result = avcodec_send_packet(context, packet);
+      result = avcodec_send_packet(context.get(), packet.get());
     }
 
     return result;
@@ -146,7 +153,7 @@ struct DecoderImplementation : TranscodingComponents {
 /// Components needed in order to decode video from a given file using FFmpeg. This struct cleanly
 /// wraps the frame decoding process, including handling framerate differences between the source
 /// file and the framerate expected by the target video target.
-struct VideoDecoderImplementation : DecoderImplementation {
+struct VideoDecoderImplementation : Decoder::Impl {
   /// Factory method for the creation of video decoders. Calling this will open a video decoder
   /// for the file at \c file_name. Will return \c nullptr if file opening failed. \c
   /// expected_framerate will determine how many frames will be decoded per second of video,
@@ -172,7 +179,7 @@ struct VideoDecoderImplementation : DecoderImplementation {
   /// decoded frames.
   VideoDecoderImplementation(string file_name, AVRational expected_framerate, double start_from,
                              double duration, double speed_ratio)
-      : DecoderImplementation(file_name, start_from, duration, speed_ratio, AVMEDIA_TYPE_VIDEO) {
+      : Decoder::Impl(file_name, start_from, duration, speed_ratio, AVMEDIA_TYPE_VIDEO) {
     if (expected_framerate.num == 0) {
       expected_framerate = stream->avg_frame_rate;
     }
@@ -180,21 +187,21 @@ struct VideoDecoderImplementation : DecoderImplementation {
       expected_framerate = stream->r_frame_rate;
     }
 
-    latest_decoded_frame = av_frame_alloc();
+    latest_decoded_frame = create_frame();
     latest_decoded_frame->pts = INT64_MIN;
     pts_increase_between_frames =
         (long)av_q2d(av_inv_q(av_mul_q(stream->time_base, expected_framerate)));
     next_timestamp = 0;
   }
 
-  ~VideoDecoderImplementation() {
-    av_frame_free(&latest_decoded_frame);
+  bool should_log() override {
+    return true;
   }
 
   /// Decodes the next frame in the file into the internal \c frame.
   int decode_next_frame() noexcept override {
     while (!latest_decoded_frame_fits_framerate()) {
-      int result = DecoderImplementation::decode_next_frame();
+      int result = Decoder::Impl::decode_next_frame();
       if (result == AVERROR_EOF && latest_decoded_frame_fits_framerate()) {
         break;
       }
@@ -204,11 +211,12 @@ struct VideoDecoderImplementation : DecoderImplementation {
       }
 
       if (frame->pts >= next_timestamp) {
-        av_frame_unref(latest_decoded_frame);
+        av_frame_unref(latest_decoded_frame.get());
         copy_frame(latest_decoded_frame, frame);
       }
     }
 
+    log_debug("sending frame %lu", frame->pts);
     copy_frame(frame, latest_decoded_frame);
     frame->pts = next_timestamp;
     next_timestamp += pts_increase_between_frames;
@@ -216,9 +224,9 @@ struct VideoDecoderImplementation : DecoderImplementation {
   }
 
 private:
-  void copy_frame(AVFrame *dst, const AVFrame *src) noexcept {
-    av_frame_copy(dst, src);
-    av_frame_copy_props(dst, src);
+  void copy_frame(shared_ptr<AVFrame> dst, const shared_ptr<AVFrame> src) noexcept {
+    av_frame_copy(dst.get(), src.get());
+    av_frame_copy_props(dst.get(), src.get());
   }
 
   /// Returns \c true if \c latest_decoded_frame is within the time range of the next frame to be
@@ -229,7 +237,7 @@ private:
 
   /// Latest read frame. This frame is saved in order to duplicate it, in case the expected frame
   /// rate requires it.
-  AVFrame *latest_decoded_frame;
+  shared_ptr<AVFrame> latest_decoded_frame;
 
   /// Timestamp of the next sent frame.
   long next_timestamp;
@@ -264,8 +272,8 @@ int Decoder::decode_next_frame() noexcept {
 
 AudioDecoder::AudioDecoder(string file_name, double start_from, double duration) {
   log_info("Open audio decoder from: %s", file_name.c_str());
-  decoder_implementation = std::make_unique<DecoderImplementation>(file_name, start_from, duration,
-                                                                   1, AVMEDIA_TYPE_AUDIO);
+  decoder_implementation =
+      std::make_unique<Decoder::Impl>(file_name, start_from, duration, 1, AVMEDIA_TYPE_AUDIO);
 }
 
 TranscodingComponents *AudioDecoder::get_transcoding_components() const noexcept {

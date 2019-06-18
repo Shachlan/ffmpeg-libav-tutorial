@@ -21,28 +21,27 @@ using namespace WRETranscoding;
 static int prepare_video_encoder(TranscodingComponents *encoder, AVFormatContext *format_context,
                                  int width, int height, string codec_name,
                                  AVRational expected_framerate) {
-  encoder->stream = avformat_new_stream(format_context, NULL);
-  encoder->codec = avcodec_find_encoder_by_name(codec_name.c_str());
+  encoder->stream = wrap_with_empty_deleter<AVStream>(avformat_new_stream(format_context, NULL));
+  encoder->codec =
+      wrap_with_empty_deleter<AVCodec>(avcodec_find_encoder_by_name(codec_name.c_str()));
 
   if (!encoder->codec) {
     log_error("could not find the proper codec");
     return -1;
   }
 
-  encoder->context = avcodec_alloc_context3(encoder->codec);
+  encoder->context = create_codec_context(encoder->codec);
   if (!encoder->context) {
     log_error("could not allocated memory for codec context");
     return -1;
   }
 
-  AVCodecContext *encoder_codec_context = encoder->context;
-
-  encoder_codec_context->height = height;
-  encoder_codec_context->width = width;
+  encoder->context->height = height;
+  encoder->context->width = width;
 
   encoder->context->pix_fmt = encoder->codec->pix_fmts[0];
 
-  if (avcodec_parameters_from_context(encoder->stream->codecpar, encoder->context) < 0) {
+  if (avcodec_parameters_from_context(encoder->stream->codecpar, encoder->context.get()) < 0) {
     log_error("could not copy encoder parameters to output stream");
     return -1;
   }
@@ -51,13 +50,13 @@ static int prepare_video_encoder(TranscodingComponents *encoder, AVFormatContext
   encoder->context->framerate = expected_framerate;
   encoder->stream->time_base = encoder->context->time_base;
 
-  if (avcodec_open2(encoder->context, encoder->codec, NULL) < 0) {
+  if (avcodec_open2(encoder->context.get(), encoder->codec.get(), NULL) < 0) {
     log_error("could not open the codec");
     return -1;
   }
 
-  encoder->frame = av_frame_alloc();
-  encoder->packet = av_packet_alloc();
+  encoder->frame = create_frame();
+  encoder->packet = create_packet();
   encoder->frame->width = width;
   encoder->frame->height = height;
   encoder->frame->format = AV_PIX_FMT_YUV420P;
@@ -70,28 +69,28 @@ static int prepare_video_encoder(TranscodingComponents *encoder, AVFormatContext
 
 static int prepare_audio_encoder(TranscodingComponents *encoder, AVFormatContext *format_context,
                                  const TranscodingComponents *decoder) {
-  encoder->stream = avformat_new_stream(format_context, NULL);
-  encoder->codec = avcodec_find_encoder(decoder->codec->id);
+  encoder->stream = wrap_with_empty_deleter<AVStream>(avformat_new_stream(format_context, NULL));
+  encoder->codec = wrap_with_empty_deleter<AVCodec>(avcodec_find_encoder(decoder->codec->id));
   encoder->frame = decoder->frame;
-  encoder->packet = av_packet_alloc();
+  encoder->packet = create_packet();
   avcodec_parameters_copy(encoder->stream->codecpar, decoder->stream->codecpar);
   if (!encoder->codec) {
     log_error("could not find the proper codec");
     return -1;
   }
 
-  encoder->context = avcodec_alloc_context3(encoder->codec);
+  encoder->context = create_codec_context(encoder->codec);
   if (!encoder->context) {
     log_error("could not allocated memory for codec context");
     return -1;
   }
 
-  if (avcodec_parameters_to_context(encoder->context, encoder->stream->codecpar) < 0) {
+  if (avcodec_parameters_to_context(encoder->context.get(), encoder->stream->codecpar) < 0) {
     log_error("could not copy encoder parameters to context");
     return -1;
   }
 
-  if (avcodec_parameters_from_context(encoder->stream->codecpar, encoder->context) < 0) {
+  if (avcodec_parameters_from_context(encoder->stream->codecpar, encoder->context.get()) < 0) {
     log_error("could not copy encoder parameters to output stream");
     return -1;
   }
@@ -99,7 +98,7 @@ static int prepare_audio_encoder(TranscodingComponents *encoder, AVFormatContext
   encoder->context->channel_layout = AV_CH_LAYOUT_STEREO;
   encoder->context->channels = av_get_channel_layout_nb_channels(encoder->context->channel_layout);
 
-  if (avcodec_open2(encoder->context, encoder->codec, NULL) < 0) {
+  if (avcodec_open2(encoder->context.get(), encoder->codec.get(), NULL) < 0) {
     log_error("could not open the audio codec");
     return -1;
   }
@@ -148,14 +147,13 @@ Encoder::Encoder(string file_name, string video_codec_name, int video_width, int
 
 static int encode_frame(TranscodingComponents *encoder, AVFormatContext *format_context,
                         AVRational source_time_base, AVFrame *frame) {
-  auto codec_context = encoder->context;
   encoder->latest_time_base = source_time_base;
 
   int ret;
-  ret = avcodec_send_frame(codec_context, frame);
+  ret = avcodec_send_frame(encoder->context.get(), frame);
 
   while (ret >= 0) {
-    ret = avcodec_receive_packet(codec_context, encoder->packet);
+    ret = avcodec_receive_packet(encoder->context.get(), encoder->packet.get());
 
     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
       break;
@@ -165,14 +163,14 @@ static int encode_frame(TranscodingComponents *encoder, AVFormatContext *format_
     }
 
     encoder->packet->stream_index = encoder->stream->index;
-    av_packet_rescale_ts(encoder->packet, source_time_base, encoder->stream->time_base);
-    ret = av_interleaved_write_frame(format_context, encoder->packet);
+    av_packet_rescale_ts(encoder->packet.get(), source_time_base, encoder->stream->time_base);
+    ret = av_interleaved_write_frame(format_context, encoder->packet.get());
 
     if (ret != 0) {
       log_error("Error %d while writing a frame", ret);
     }
   }
-  av_packet_unref(encoder->packet);
+  av_packet_unref(encoder->packet.get());
   return 0;
 }
 
@@ -180,13 +178,13 @@ int Encoder::encode_video_frame(double source_time_base, long source_timestamp) 
   video_encoder->frame->pts = source_timestamp;
   video_conversion_context->convert_to_frame(video_encoder->frame);
   return encode_frame(video_encoder.get(), format_context, wre_double_to_rational(source_time_base),
-                      video_encoder->frame);
+                      video_encoder->frame.get());
 }
 
 int Encoder::encode_audio_frame(double source_time_base, long source_timestamp) noexcept {
   audio_encoder->frame->pts = source_timestamp;
   return encode_frame(audio_encoder.get(), format_context, wre_double_to_rational(source_time_base),
-                      audio_encoder->frame);
+                      audio_encoder->frame.get());
 }
 
 int Encoder::finish_encoding() noexcept {

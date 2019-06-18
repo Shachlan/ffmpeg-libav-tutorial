@@ -4,15 +4,16 @@
 #include <functional>
 
 #include "Transcoding/VideoFormatConverter.hpp"
+
 namespace WRETranscoding {
 
-struct DecoderImplementation;
 struct TranscodingComponents;
 struct VideoFormatConverter;
 
 /// Abstract base struct for decoders of single audio or video streams. Implements getters for basic
 /// stream information.
 struct Decoder {
+  struct Impl;
   Decoder() = default;
   ~Decoder();
 
@@ -34,7 +35,7 @@ struct Decoder {
 
 protected:
   /// Concrete implementation of the decoding class.
-  std::unique_ptr<DecoderImplementation> decoder_implementation;
+  unique_ptr<Impl> decoder_implementation;
 };
 
 /// Decoder of audio streams.
@@ -74,7 +75,7 @@ struct VideoDecoder : Decoder {
   /// start_from + \c duration is larger than the duration of the stream, the decoder will decode
   /// until the end of the stream and stop, thus resulting in a shorter than requested duration.
   ///
-  /// @param speed_ration - the ratio between the speed of the original stream and of the decoded
+  /// @param speed_ratio - the ratio between the speed of the original stream and of the decoded
   /// frames.
   ///
   /// These parameters create a mapping between the source stream and resulting frames thus:
@@ -95,7 +96,7 @@ struct VideoDecoder : Decoder {
   /// @note TReadFunc must take \c const \c uint8_t * as a single argument.
   template <class TReadFunc>
   decltype(auto) read_from_rgb_buffer(TReadFunc &&buffer_read) const {
-    return video_conversion_context->read_from_rgb_buffer(buffer_read);
+    return video_conversion_context->read_from_rgb_buffer(std::forward<TReadFunc>(buffer_read));
   }
 
   /// Returns the width, in pixels, of the decoded video.
@@ -110,7 +111,7 @@ struct VideoDecoder : Decoder {
 
 private:
   /// Converter between the video's native pixel format and packed RGB format.
-  std::unique_ptr<VideoFormatConverter> video_conversion_context;
+  unique_ptr<VideoFormatConverter> video_conversion_context;
 };
 
 }  // namespace WRETranscoding

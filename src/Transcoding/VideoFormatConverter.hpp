@@ -34,10 +34,10 @@ struct VideoFormatConverter {
   struct DecodingConverionTag {};
 
   /// Construct a new converter, from RGB pixel data to the given \c context.
-  VideoFormatConverter(AVCodecContext *context, EncodingConverionTag);
+  VideoFormatConverter(shared_ptr<AVCodecContext> context, EncodingConverionTag);
 
   /// Construct a new converter, from the given \c context to RGB pixel data.
-  VideoFormatConverter(AVCodecContext *context, DecodingConverionTag);
+  VideoFormatConverter(shared_ptr<AVCodecContext> context, DecodingConverionTag);
   ~VideoFormatConverter();
 
   VideoFormatConverter &operator=(const VideoFormatConverter &other) = delete;
@@ -46,12 +46,12 @@ struct VideoFormatConverter {
   /// Converts the data in the given \c frame into the internal RGB buffer. This takes the data in
   /// \c frame, converts its colorspace to the colorspace of the converter and scales the data from
   /// the size of \c frame to the size of the internal buffer.
-  void convert_from_frame(AVFrame *frame) noexcept;
+  void convert_from_frame(shared_ptr<AVFrame> frame) noexcept;
 
   /// Converts the data in the internal RGB buffer into the given \c frame. This takes the data in
   /// the internal buffer, converts its colorspace to the colorspace of \c frame and scales the data
   /// from the size of the internal buffer to \c frame's size.
-  void convert_to_frame(AVFrame *frame) noexcept;
+  void convert_to_frame(shared_ptr<AVFrame> frame) noexcept;
 
   /// Calls the given \c buffer_read function over the internal RGB buffer.
   /// This will allow the function to access the buffer da, without modifying it. Passing
