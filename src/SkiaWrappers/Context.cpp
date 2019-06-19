@@ -6,16 +6,14 @@
 
 #include "SkiaWrappers/SurfacePool.hpp"
 #include "SkiaWrappers/TypefaceFactory.hpp"
-#include "opengl/TexturePool.hpp"
 
 using namespace WRESkiaRendering;
-using WREOpenGL::TexturePool;
 
 class Context::Impl {
 public:
-  Impl(sk_sp<GrContext> context, shared_ptr<TexturePool> texture_pool, int width, int height)
+  Impl(sk_sp<GrContext> context, int width, int height)
       : context(context),
-        surface_pool(std::make_unique<SurfacePool>(context, texture_pool, width, height)),
+        surface_pool(std::make_shared<SurfacePool>(context, width, height)),
         typeface_factory(std::make_shared<TypefaceFactory>()) {
   }
 
@@ -25,8 +23,8 @@ private:
   const shared_ptr<TypefaceFactory> typeface_factory;
 };
 
-Context::Context(shared_ptr<TexturePool> texture_pool, int width, int height)
-    : impl(std::make_unique<Context::Impl>(GrContext::MakeGL(), texture_pool, width, height)) {
+Context::Context(int width, int height)
+    : impl(std::make_unique<Context::Impl>(GrContext::MakeGL(), width, height)) {
 }
 
 unique_ptr<WRERendering::TextRenderer> Context::get_text_renderer() {

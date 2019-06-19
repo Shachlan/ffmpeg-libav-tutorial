@@ -1,7 +1,7 @@
 // Copyright (c) 2019 Lightricks. All rights reserved.
 // Created by Shachar Langbeheim.
 
-// class TexturePool {
+// class TextureAllocator {
 // public:
 //   uint32_t get_array_buffer();
 //   uint32_t get_elements_array_buffer();

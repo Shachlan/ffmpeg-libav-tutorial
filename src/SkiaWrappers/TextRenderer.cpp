@@ -1,31 +1,35 @@
-#include "SkiaWrappers/TextRenderer.hpp"
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
 
-#include <GrContext.h>
-#include <SkFont.h>
-#include <SkSurface.h>
-#include <SkTextBlob.h>
-#include <SkTypeface.h>
+#include "TextRenderer.hpp"
 
-#include "SkiaWrappers/SkiaException.hpp"
-#include "SkiaWrappers/SurfacePool.hpp"
-#include "SkiaWrappers/TypefaceFactory.hpp"
+#include <core/SkFont.h>
+#include <core/SkTextBlob.h>
+#include <core/SkTypeface.h>
+#include <core/Sksurface.h>
+#include <gpu/GrContext.h>
+
+#include "SkiaException.hpp"
+#include "SurfacePool.hpp"
+#include "TypefaceFactory.hpp"
 
 using WRESkiaRendering::TextRenderer;
 
-TextRenderer::TextRenderer(shared_ptr<TypefaceFactory> typeface_factory, SurfaceInfo surface_info)
-    : surface_info(surface_info), typeface_factory(typeface_factory) {
+TextRenderer::TextRenderer(shared_ptr<TypefaceFactory> typeface_factory,
+                           shared_ptr<Surface> surface)
+    : surface(surface), typeface_factory(typeface_factory) {
 }
 
 uint32_t TextRenderer::render_text(string text, TextRenderConfiguration configuration) {
-  surface_info.context->resetContext();
-  auto canvas = surface_info.surface->getCanvas();
+  surface->context->resetContext();
+  auto canvas = surface->surface->getCanvas();
   auto text_color = SkColor4f::FromColor(
       SkColorSetARGB(configuration.text_color[3], configuration.text_color[0],
                      configuration.text_color[1], configuration.text_color[2]));
   SkPaint paint2(text_color);
   auto typeface = typeface_factory->get_typeface(configuration.font_name);
   if (typeface == nullptr) {
-    throw SkiaException("unknown typeface: " + configuration.font_name);
+    throw SkiaException("Typeface not found: %s", configuration.font_name.c_str());
   }
 
   auto text_blob =
@@ -33,5 +37,5 @@ uint32_t TextRenderer::render_text(string text, TextRenderConfiguration configur
   canvas->drawTextBlob(text_blob.get(), configuration.xCoord, configuration.yCoord, paint2);
   canvas->flush();
 
-  return surface_info.backing_texture_name;
+  return surface->backing_texture->name;
 }

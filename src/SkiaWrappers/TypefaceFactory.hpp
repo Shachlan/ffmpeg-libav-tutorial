@@ -1,4 +1,7 @@
-#include <SkRefCnt.h>
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
+
+#include <core/SkRefCnt.h>
 #include <unordered_map>
 
 class SkTypeface;

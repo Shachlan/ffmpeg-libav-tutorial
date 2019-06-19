@@ -1,13 +1,16 @@
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
+
 #include "SurfacePool.hpp"
 
-#include <GrContext.h>
-#include <OpenGL/gl3.h>
-#include <SkSurface.h>
 #include <gpu/GrBackendSurface.h>
+#include <gpu/GrContext.h>
+#include <gpu/gl/GrGlTypes.h>
 #include <src/gpu/gl/GrGLDefines.h>
 
 #include "SkiaException.hpp"
-#include "opengl/TexturePool.hpp"
+#include "Surface.hpp"
+#include "opengl/OpenGLHeaders.hpp"
 
 using namespace WRESkiaRendering;
 
@@ -16,8 +19,7 @@ static sk_sp<SkSurface> create_surface(int width, int height, GLuint texture_nam
   log_info("creating surface with texture %u", texture_name);
   glBindTexture(GL_TEXTURE_2D, texture_name);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  GrGLTextureInfo texture_info = {
-      .fID = texture_name, .fTarget = GL_TEXTURE_2D, .fFormat = GR_GL_RGBA8};
+  GrGLTextureInfo texture_info = {GL_TEXTURE_2D, texture_name, GR_GL_RGBA8};
   GrBackendTexture texture(width, height, GrMipMapped::kNo, texture_info);
   auto surface =
       sk_sp(SkSurface::MakeFromBackendTexture(skia_context.get(), texture, kTopLeft_GrSurfaceOrigin,
@@ -29,45 +31,33 @@ static sk_sp<SkSurface> create_surface(int width, int height, GLuint texture_nam
   return surface;
 }
 
-SurfacePool::SurfacePool(sk_sp<GrContext> context,
-                         std::shared_ptr<WREOpenGL::TexturePool> texture_pool, int surface_width,
-                         int surface_height)
-    : context(context),
-      texture_pool(texture_pool),
-      surface_width(surface_width),
-      surface_height(surface_height) {
+SurfacePool::SurfacePool(sk_sp<GrContext> context, int surface_width, int surface_height)
+    : surface_width(surface_width), surface_height(surface_height), context(context) {
 }
 
 SurfacePool::~SurfacePool() {
-  // TODO - release all textures
+  flush();
 }
 
-SurfaceInfo SurfacePool::get_surface_info() {
-  SurfaceInfo surface_info;
+unique_ptr<Surface> SurfacePool::get_surface() {
   if (available_surfaces.empty()) {
-    auto texture_name = texture_pool->get_texture();
-    surface_info =
-        SurfaceInfo(texture_name,
-                    create_surface(surface_width, surface_height, texture_name, context), context);
-  } else {
-    auto begin_iter = available_surfaces.begin();
-    surface_info = *begin_iter;
-    available_surfaces.erase(begin_iter);
+    auto texture = WREOpenGL::Texture::make_texture(surface_width, surface_height, GL_RGBA);
+    auto surface = create_surface(surface_width, surface_height, texture->name, context);
+    return std::make_unique<Surface>(std::move(texture), surface, context);
   }
 
-  used_surfaces.insert(used_surfaces.begin(), surface_info);
-  auto canvas = surface_info.surface->getCanvas();
-  canvas->clear(SkColorSetARGB(255, 0, 0, 0));
-
-  return surface_info;
+  auto begin_iter = available_surfaces.begin();
+  auto surface = std::move(*begin_iter);
+  available_surfaces.erase(begin_iter);
+  return surface;
 }
 
-void SurfacePool::release_surface(SurfaceInfo surface_info) {
-  for (auto iter = used_surfaces.begin(); iter != used_surfaces.end(); iter++) {
-    if ((*iter).backing_texture_name == surface_info.backing_texture_name) {
-      used_surfaces.erase(iter);
-      break;
-    }
-  }
-  available_surfaces.insert(available_surfaces.begin(), surface_info);
+void SurfacePool::release_surface(Surface &surface) {
+  available_surfaces.insert(available_surfaces.begin(),
+                            std::make_unique<Surface>(std ::move(surface.backing_texture),
+                                                      surface.surface, surface.context));
+}
+
+void SurfacePool::flush() {
+  available_surfaces.clear();
 }

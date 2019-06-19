@@ -1,4 +1,7 @@
-#include "SkiaWrappers/SurfaceInfo.hpp"
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
+
+#include "Surface.hpp"
 
 namespace WRESkiaRendering {
 class TypefaceFactory;
@@ -13,11 +16,11 @@ struct TextRenderConfiguration {
 
 class TextRenderer {
 public:
-  TextRenderer(shared_ptr<TypefaceFactory> typeface_factory, SurfaceInfo surface_info);
+  TextRenderer(shared_ptr<TypefaceFactory> typeface_factory, shared_ptr<Surface> surface);
   uint32_t render_text(string text, TextRenderConfiguration configuration);
 
 private:
-  const SurfaceInfo surface_info;
+  const shared_ptr<Surface> surface;
   const shared_ptr<TypefaceFactory> typeface_factory;
 };
 }  // namespace WRESkiaRendering

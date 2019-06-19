@@ -1,6 +1,9 @@
+// Copyright (c) 2019 Lightricks. All rights reserved.
+// Created by Shachar Langbeheim.
+
 #include "TypefaceFactory.hpp"
 
-#include <SkTypeface.h>
+#include <core/SkTypeface.h>
 
 sk_sp<SkTypeface> WRESkiaRendering::TypefaceFactory::get_typeface(string typeface_file_name) {
   auto iter = file_to_typeface_mapping.find(typeface_file_name);

@@ -1,6 +1,3 @@
-namespace WREOpenGL {
-class TexturePool;
-}
 
 namespace WRERendering {
 class Context {
@@ -16,7 +13,6 @@ protected:
   setup(int width, int height);
 
 private:
-  shared_ptr<WREOpenGL::TexturePool> texture_pool;
   RenderingModel rendering_model;
 };
 

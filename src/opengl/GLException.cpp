@@ -1,9 +1,8 @@
 // Copyright (c) 2019 Lightricks. All rights reserved.
 // Created by Shachar Langbeheim.
 
-#include "opengl/GLException.hpp"
-
 #include <stdio.h>
+#include <vector>
 
 #include "opengl/OpenGLHeaders.hpp"
 
@@ -43,21 +42,6 @@ static string error_descriptions(vector<GLenum> error_codes) {
   return error_descriptions;
 }
 
-static GLException get_exception(string format, va_list argList) {
-  GLException exception;
-  vasprintf(&exception.full_description, format.c_str(), argList);
-  return exception;
-}
-
-void throw_gl_exception(string format, ...) {
-  va_list argList;
-  va_start(argList, format);
-  auto exception = get_exception(format, argList);
-  va_end(argList);
-
-  throw exception;
-}
-
 static vector<GLenum> get_openGL_errors() {
   vector<GLenum> errors;
   GLenum error;
@@ -76,9 +60,10 @@ void check_gl_errors(string format, ...) {
   }
 
   format += error_descriptions(errors);
+  GLException exception;
   va_list argList;
   va_start(argList, format);
-  auto exception = get_exception(format, argList);
+  vasprintf(&exception.full_description, format.c_str(), argList);
   va_end(argList);
 
   throw exception;

@@ -115,7 +115,7 @@ static GLuint build_shader(const GLchar *shader_source, GLenum shader_type) {
   glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logSize);
   GLchar *errorLog = (GLchar *)calloc(logSize, sizeof(GLchar));
   glGetShaderInfoLog(shader, logSize, 0, errorLog);
-  throw_gl_exception("Failed to build shader with error:\n%s", errorLog);
+  // throw_gl_exception("Failed to build shader with error:\n%s", errorLog);
   return 0;
 }
 
@@ -144,7 +144,7 @@ static string get_shader_text(string shader_name, GLenum shader_type) {
   auto shader_file_name = get_shader_filename(shader_name, shader_type);
   std::ifstream stream(shader_file_name);
   if (!stream.is_open()) {
-    throw_gl_exception("Can't open shader file %s", shader_file_name.c_str());
+    // throw_gl_exception("Can't open shader file %s", shader_file_name.c_str());
   }
   std::stringstream buffer;
   buffer << stream.rdbuf();
@@ -174,7 +174,7 @@ GLuint create_program(GLuint vertex_shader, GLuint fragment_shader) {
 
     GLchar infoLog[maxLength];
     glGetProgramInfoLog(program, maxLength, &maxLength, &infoLog[0]);
-    throw_gl_exception("Failed to create program with error:\n%s", infoLog);
+    // throw_gl_exception("Failed to create program with error:\n%s", infoLog);
   }
   return program;
 }
