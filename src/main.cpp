@@ -36,7 +36,6 @@ int main(int argc, char *argv[]) {
     log_debug("start");
     int height = output_model.height;
     int width = output_model.width;
-    auto expected_framerate = 60;
 
     auto vector = *(render_model.layers.get());
     auto base_layer = vector.at(0);
@@ -53,8 +52,9 @@ int main(int argc, char *argv[]) {
     log_info("audio decoder");
     auto audio_decoder = AudioDecoder(argv[1], 1, 0);
 
-    auto encoder = Encoder(output_model.source, "libx264", width, height, expected_framerate,
-                           audio_decoder.get_transcoding_components());
+    auto encoder =
+        Encoder(output_model.source, "libx264", width, height, layer->get_expected_framerate(),
+                audio_decoder.get_transcoding_components());
 
     setupOpenGL(width, height, NULL);
 

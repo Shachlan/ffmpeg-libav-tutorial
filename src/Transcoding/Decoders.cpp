@@ -89,10 +89,6 @@ struct Decoder::Impl : TranscodingComponents {
     avformat_free_context(format_context);
   }
 
-  virtual bool should_log() {
-    return false;
-  }
-
   /// Decodes the next frame in the file into the internal \c frame.
   virtual int decode_next_frame() noexcept {
     int result = 0;
@@ -108,9 +104,6 @@ struct Decoder::Impl : TranscodingComponents {
           continue;
         }
 
-        if (should_log()) {
-          log_debug("decoding frame %lu", frame->pts);
-        }
         return 0;
       }
       if (result != AVERROR(EAGAIN)) {
@@ -188,19 +181,22 @@ struct VideoDecoderImplementation : Decoder::Impl {
     }
 
     latest_decoded_frame = create_frame();
+    previous_decoded_frame = create_frame();
     latest_decoded_frame->pts = INT64_MIN;
     pts_increase_between_frames =
         (long)av_q2d(av_inv_q(av_mul_q(stream->time_base, expected_framerate)));
     next_timestamp = 0;
   }
 
-  bool should_log() override {
-    return true;
+  shared_ptr<AVFrame> frame_to_use() {
+    auto previous_distance = abs(next_timestamp - previous_decoded_frame->pts);
+    auto latest_distance = abs(next_timestamp - latest_decoded_frame->pts);
+    return previous_distance > latest_distance ? latest_decoded_frame : previous_decoded_frame;
   }
 
   /// Decodes the next frame in the file into the internal \c frame.
   int decode_next_frame() noexcept override {
-    while (!latest_decoded_frame_fits_framerate()) {
+    while (!should_decode_frame()) {
       int result = Decoder::Impl::decode_next_frame();
       if (result == AVERROR_EOF && latest_decoded_frame_fits_framerate()) {
         break;
@@ -210,14 +206,22 @@ struct VideoDecoderImplementation : Decoder::Impl {
         return result;
       }
 
-      if (frame->pts >= next_timestamp) {
+      if (latest_decoded_frame->pts < 0) {
+        av_frame_unref(previous_decoded_frame.get());
+        copy_frame(previous_decoded_frame, frame);
+        Decoder::Impl::decode_next_frame();
         av_frame_unref(latest_decoded_frame.get());
         copy_frame(latest_decoded_frame, frame);
+        continue;
       }
+
+      av_frame_unref(latest_decoded_frame.get());
+      copy_frame(previous_decoded_frame, latest_decoded_frame);
+      av_frame_unref(latest_decoded_frame.get());
+      copy_frame(latest_decoded_frame, frame);
     }
 
-    log_debug("sending frame %lu", frame->pts);
-    copy_frame(frame, latest_decoded_frame);
+    copy_frame(frame, frame_to_use());
     frame->pts = next_timestamp;
     next_timestamp += pts_increase_between_frames;
     return 0;
@@ -235,9 +239,15 @@ private:
     return latest_decoded_frame->pts + pts_increase_between_frames > next_timestamp;
   }
 
+  bool should_decode_frame() const noexcept {
+    return previous_decoded_frame->pts < next_timestamp &&
+           latest_decoded_frame->pts >= next_timestamp;
+  }
+
   /// Latest read frame. This frame is saved in order to duplicate it, in case the expected frame
   /// rate requires it.
   shared_ptr<AVFrame> latest_decoded_frame;
+  shared_ptr<AVFrame> previous_decoded_frame;
 
   /// Timestamp of the next sent frame.
   long next_timestamp;

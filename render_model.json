@@ -1,11 +1,11 @@
 [
   {
     "type": "video",
-    "source": "./../movies/dog.mp4",
-    "expected_framerate": 30,
-    "start_from": 1,
-    "duration": 3,
-    "speed_ratio": 1.5
+    "source": "./../movies/small_bunny_1080p_60fps.mp4",
+    "expected_framerate": 24,
+    "start_from": 0,
+    "duration": 20,
+    "speed_ratio": 1
   },
   {
     "type": "text",
