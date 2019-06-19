@@ -225,7 +225,13 @@ void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
   surface_pool->release_surface(*text_surface.get());
   surface_pool->release_surface(*lottie_surface.get());
   text_surface = surface_pool->get_surface();
+  auto canvas = text_surface->surface->getCanvas();
+  canvas->clear(SkColorSetARGB(255, 0, 0, 0));
+
   lottie_surface = surface_pool->get_surface();
+  canvas = lottie_surface->surface->getCanvas();
+  canvas->clear(SkColorSetARGB(255, 0, 0, 0));
+
 }
 
 uint32_t render_text(string text, int xCoord, int yCoord, int font_size) {
