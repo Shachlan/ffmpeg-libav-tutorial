@@ -2,7 +2,7 @@
 
 #include "OpenGLHeaders.hpp"
 
-using WREOpenGL::Texture;
+using wre_opengl::Texture;
 
 Texture::~Texture() {
   glDeleteTextures(1, &name);

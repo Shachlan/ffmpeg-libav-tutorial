@@ -1,9 +1,9 @@
-// Copyright (c) 2019 Lightricks. All rights reserved.
+// C /pyright (c) 2019 Lightricks. All rights reserved.
 // Created by Shachar Langbeheim.
 
 #pragma once
 
-#include "Base/BaseException.hpp"
+#include "base/BaseException.hpp"
 
 namespace WRESkiaRendering {
 DefineException(SkiaException);

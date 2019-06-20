@@ -5,7 +5,7 @@
 
 #include <gpu/GrBackendSurface.h>
 #include <gpu/GrContext.h>
-#include <gpu/gl/GrGlTypes.h>
+#include <gpu/gl/GrGLTypes.h>
 #include <src/gpu/gl/GrGLDefines.h>
 
 #include "SkiaException.hpp"
@@ -41,7 +41,7 @@ SurfacePool::~SurfacePool() {
 
 unique_ptr<Surface> SurfacePool::get_surface() {
   if (available_surfaces.empty()) {
-    auto texture = WREOpenGL::Texture::make_texture(surface_width, surface_height, GL_RGBA);
+    auto texture = wre_opengl::Texture::make_texture(surface_width, surface_height, GL_RGBA);
     auto surface = create_surface(surface_width, surface_height, texture->name, context);
     return std::make_unique<Surface>(std::move(texture), surface, context);
   }

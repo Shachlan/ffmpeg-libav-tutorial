@@ -33,7 +33,7 @@ extern "C" {
 #include <modules/skottie/include/Skottie.h>
 #include <src/core/SkMakeUnique.h>
 #include <src/core/SkOSFile.h>
-#include <src/gpu/gl/GrGlDefines.h>
+#include <src/gpu/gl/GrGLDefines.h>
 #include <src/utils/SkOSPath.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,8 +45,9 @@ extern "C" {
 #include "SkiaWrappers/SurfacePool.hpp"
 #include "SkiaWrappers/TextRenderer.hpp"
 #include "SkiaWrappers/TypefaceFactory.hpp"
+#include "DrawCall.hpp"
 
-using namespace WREOpenGL;
+using namespace wre_opengl;
 using WRESkiaRendering::SurfacePool;
 
 static ProgramPool program_pool;
@@ -197,26 +198,19 @@ void loadTexture(uint32_t texture_name, int width, int height, const uint8_t *bu
 }
 
 void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
-  // log_debug("start blend");
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  glClearColor(0, 0, 0, 0);
-  glClear(GL_COLOR_BUFFER_BIT);
+  DrawCall call;
 
+  call._frameBuffer = 0;
+  call._clearColor = RgbaColor(0,0,0,0);
   auto program = get_blend_program();
-  glUseProgram(program);
-  glBindVertexArray(blend_program.vertex_array);
-  glUniform1f(glGetUniformLocation(program, "blendFactor"), blend_ratio);
+  call._program = program;
+  call._vertexArray = blend_program.vertex_array;
+  call._floatUniforms.emplace_back(glGetUniformLocation(program, "blendFactor"), blend_ratio);
+  call._textures.emplace_back(texture1ID, glGetUniformLocation(program, "tex1"));
+  call._textures.emplace_back(texture2ID, glGetUniformLocation(program, "tex2"));
+  call._numberOfTrianglesToDraw = 6;
 
-  glActiveTexture(GL_TEXTURE0 + texture1ID);
-  glBindTexture(GL_TEXTURE_2D, texture1ID);
-  glUniform1i(glGetUniformLocation(program, "tex1"), texture1ID);
-
-  glActiveTexture(GL_TEXTURE0 + texture2ID);
-  glBindTexture(GL_TEXTURE_2D, texture2ID);
-  glUniform1i(glGetUniformLocation(program, "tex2"), texture2ID);
-
-  glDrawArrays(GL_TRIANGLES, 0, 6);
-  // log_debug("end blend");
+  call.draw();
 }
 
 void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
@@ -231,7 +225,6 @@ void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
   lottie_surface = surface_pool->get_surface();
   canvas = lottie_surface->surface->getCanvas();
   canvas->clear(SkColorSetARGB(255, 0, 0, 0));
-
 }
 
 uint32_t render_text(string text, int xCoord, int yCoord, int font_size) {

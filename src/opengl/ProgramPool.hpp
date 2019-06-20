@@ -3,7 +3,7 @@
 
 #include <unordered_map>
 
-namespace WREOpenGL {
+namespace wre_opengl {
 class ProgramPool {
 public:
   uint32_t get_program(string vertex_shader, string fragment_shader);
@@ -18,4 +18,4 @@ private:
   std::unordered_map<uint32_t, string> name_to_description_mapping;
   std::unordered_map<uint32_t, uint32_t> program_reference_count;
 };
-}  // namespace WREOpenGL
+}  // namespace wre_opengl

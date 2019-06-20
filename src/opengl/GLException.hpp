@@ -1,11 +1,11 @@
-// Copyright (c) 2019 Lightricks. All rights reserved.
+// C /pyright (c) 2019 Lightricks. All rights reserved.
 // Created by Shachar Langbeheim.
 
 #pragma once
 
-#include "Base/BaseException.hpp"
+#include "base/BaseException.hpp"
 
-namespace WREOpenGL {
+namespace wre_opengl {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
@@ -23,4 +23,4 @@ void check_gl_errors(string format, ...);
 
 DefineException(GLException);
 
-}  // namespace WREOpenGL
+}  // namespace wre_opengl

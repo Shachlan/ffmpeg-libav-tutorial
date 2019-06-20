@@ -6,7 +6,7 @@
 #include <core/SkFont.h>
 #include <core/SkTextBlob.h>
 #include <core/SkTypeface.h>
-#include <core/Sksurface.h>
+#include <core/SkSurface.h>
 #include <gpu/GrContext.h>
 
 #include "SkiaException.hpp"

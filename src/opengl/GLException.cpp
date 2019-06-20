@@ -8,7 +8,7 @@
 
 using std::vector;
 
-namespace WREOpenGL {
+namespace wre_opengl {
 
 static string error_description(GLenum error_code) {
   switch (error_code) {
@@ -69,4 +69,4 @@ void check_gl_errors(string format, ...) {
   throw exception;
 }
 
-}  // namespace WREOpenGL
+}  // namespace wre_opengl

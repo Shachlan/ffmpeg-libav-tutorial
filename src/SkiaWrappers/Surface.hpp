@@ -12,7 +12,7 @@
 namespace WRESkiaRendering {
 /// Information needed to use a Skia surface.
 struct Surface {
-  Surface(unique_ptr<WREOpenGL::Texture> &&backing_texture, sk_sp<SkSurface> surface,
+  Surface(unique_ptr<wre_opengl::Texture> &&backing_texture, sk_sp<SkSurface> surface,
           sk_sp<GrContext> context)
       : surface(surface), context(context), backing_texture(std::move(backing_texture)) {}
   Surface() = default;
@@ -28,6 +28,6 @@ struct Surface {
   sk_sp<GrContext> context;
 
   /// Name of the OpenGL texture backing the surface.
-  unique_ptr<WREOpenGL::Texture> backing_texture;
+  unique_ptr<wre_opengl::Texture> backing_texture;
 };
 }  // namespace WRESkiaRendering

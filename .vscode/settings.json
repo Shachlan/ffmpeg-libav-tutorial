@@ -94,7 +94,9 @@
     "stack": "cpp",
     "strstream": "cpp",
     "bit": "cpp",
-    "__functional_03": "cpp"
+    "__functional_03": "cpp",
+    "valarray": "cpp",
+    "*.inc": "cpp"
   },
 "git.ignoreLimitWarning": true,
 "glsllint.glslangValidatorPath": "/usr/local/Cellar/glslang/7.11.3188"

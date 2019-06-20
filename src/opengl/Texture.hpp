@@ -1,6 +1,6 @@
 #pragma once
 
-namespace WREOpenGL {
+namespace wre_opengl {
 struct Texture {
   static unique_ptr<Texture> make_texture(int width, int height, uint32_t format);
 
@@ -24,4 +24,4 @@ private:
       : name(name), width(width), height(height), format(format) {
   }
 };
-}  // namespace WREOpenGL
+}  // namespace wre_opengl

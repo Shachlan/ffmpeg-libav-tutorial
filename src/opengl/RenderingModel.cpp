@@ -19,7 +19,7 @@ static layer_ptr get_layer(json object) {
     return std::make_shared<TextLayer>(object["text"].get<string>(), object["font"].get<string>(),
                                        object["font_size"].get<int>());
   }
-  throw std::runtime_error("unknown type: " + type);
+  throw std::runtime_error("unknown type: " + to_string(type));
 }
 
 static unique_ptr<Layers> get_layers(json layers_model) {

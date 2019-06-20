@@ -58,7 +58,7 @@ void main(void) {
 
 #endif
 
-using namespace WREOpenGL;
+using namespace wre_opengl;
 
 void ProgramPool::delete_program(GLuint program_name) {
   auto shaders = this->name_to_shader_names_mapping[program_name];
