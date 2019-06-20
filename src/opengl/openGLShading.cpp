@@ -40,12 +40,12 @@ extern "C" {
 #include <fstream>
 #include <sstream>
 
+#include "DrawCall.hpp"
 #include "GLException.hpp"
 #include "ProgramPool.hpp"
 #include "SkiaWrappers/SurfacePool.hpp"
 #include "SkiaWrappers/TextRenderer.hpp"
 #include "SkiaWrappers/TypefaceFactory.hpp"
-#include "DrawCall.hpp"
 
 using namespace wre_opengl;
 using WRESkiaRendering::SurfacePool;
@@ -104,24 +104,12 @@ static GLuint generate_vertex_array() {
 static GLuint position_buffer_setup(GLuint program) {
   GLuint positionBuf;
   glGenBuffers(1, &positionBuf);
-  glBindBuffer(GL_ARRAY_BUFFER, positionBuf);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(position), position, GL_STATIC_DRAW);
-
-  GLint loc = glGetAttribLocation(program, "position");
-  glEnableVertexAttribArray(loc);
-  glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
   return positionBuf;
 }
 
 static GLuint texture_buffer_setup(GLuint program, string buffer_name) {
   GLuint texturesBuffer;
   glGenBuffers(1, &texturesBuffer);
-  glBindBuffer(GL_ARRAY_BUFFER, texturesBuffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(textureCoords), textureCoords, GL_STATIC_DRAW);
-
-  GLint loc = glGetAttribLocation(program, buffer_name.c_str());
-  glEnableVertexAttribArray(loc);
-  glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
   return texturesBuffer;
 }
 
@@ -201,13 +189,26 @@ void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
   DrawCall call;
 
   call._frameBuffer = 0;
-  call._clearColor = RgbaColor(0,0,0,0);
+  call._clearColor = RgbaColor(0, 0, 0, 0);
   auto program = get_blend_program();
   call._program = program;
   call._vertexArray = blend_program.vertex_array;
   call._floatUniforms.emplace_back(glGetUniformLocation(program, "blendFactor"), blend_ratio);
   call._textures.emplace_back(texture1ID, glGetUniformLocation(program, "tex1"));
   call._textures.emplace_back(texture2ID, glGetUniformLocation(program, "tex2"));
+  GLint loc = glGetAttribLocation(program, "position");
+  call._attributes.emplace_back(loc, blend_program.position_buffer, 2, GL_FLOAT, GL_FALSE, 0,
+                                nullptr);
+
+  loc = glGetAttribLocation(program, "texCoord");
+  call._attributes.emplace_back(loc, blend_program.texture_buffer, 2, GL_FLOAT, GL_FALSE, 0,
+                                nullptr);
+
+  call._arrayBuffers.emplace_back(blend_program.position_buffer, GL_ARRAY_BUFFER, sizeof(position),
+                                  (void *)position, GL_STATIC_DRAW);
+  call._arrayBuffers.emplace_back(blend_program.texture_buffer, GL_ARRAY_BUFFER,
+                                  sizeof(textureCoords), (void *)textureCoords, GL_STATIC_DRAW);
+
   call._numberOfTrianglesToDraw = 6;
 
   call.draw();

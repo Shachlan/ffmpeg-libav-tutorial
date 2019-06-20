@@ -35,12 +35,33 @@ struct TextureUniform {
   GLuint _uniform;
 };
 
+struct VertexAttribute {
+  VertexAttribute(GLuint index, GLuint bufferIndex, GLint size, GLenum type, GLboolean normalized,
+                  GLsizei stride, GLvoid *data)
+      : _index(index),
+        _bufferIndex(bufferIndex),
+        _size(size),
+        _type(type),
+        _normalized(normalized),
+        _stride(stride),
+        _data(data) {}
+
+  GLuint _index;
+  GLuint _bufferIndex;
+  GLint _size;
+  GLenum _type;
+  GLboolean _normalized;
+  GLsizei _stride;
+  GLvoid *_data;
+};
+
 struct DrawCall {
   void draw();
   std::optional<GLuint> _vertexArray;
   std::optional<GLuint> _program;
   std::optional<GLuint> _frameBuffer;
   std::optional<RgbaColor> _clearColor;
+  std::vector<VertexAttribute> _attributes;
   std::vector<TextureUniform> _textures;
   std::vector<ArrayBuffer> _arrayBuffers;
   std::vector<Uniform<int>> _intUniforms;

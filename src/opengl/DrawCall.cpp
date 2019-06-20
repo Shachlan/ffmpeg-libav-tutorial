@@ -31,6 +31,14 @@ void DrawCall::draw() {
     GLCheckDbg("Setup buffer.");
   }
 
+  for (const auto &attribute : _attributes) {
+    glBindBuffer(GL_ARRAY_BUFFER, attribute._bufferIndex);
+    glEnableVertexAttribArray(attribute._index);
+    glVertexAttribPointer(attribute._index, attribute._size, attribute._type, attribute._normalized,
+                          attribute._stride, attribute._data);
+    GLCheckDbg("Setup attribute.");
+  }
+
   GLenum index = 0;
   for (const auto &texture : _textures) {
     glActiveTexture(GL_TEXTURE0 + index);
