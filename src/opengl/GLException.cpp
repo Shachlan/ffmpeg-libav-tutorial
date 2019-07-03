@@ -6,6 +6,7 @@
 
 #include "opengl/OpenGLHeaders.hpp"
 
+using std::string;
 using std::vector;
 
 namespace wre_opengl {
@@ -53,7 +54,7 @@ static vector<GLenum> get_openGL_errors() {
   return errors;
 }
 
-void check_gl_errors(string format, ...) {
+void check_gl_errors(std::string format, ...) {
   auto errors = get_openGL_errors();
   if (errors.size() == 0) {
     return;

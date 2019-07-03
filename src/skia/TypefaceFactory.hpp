@@ -6,12 +6,12 @@
 
 class SkTypeface;
 
-namespace WRESkiaRendering {
+namespace wre_skia {
 class TypefaceFactory {
 public:
-  sk_sp<SkTypeface> get_typeface(string typeface_file_name);
+  sk_sp<SkTypeface> get_typeface(std::string typeface_file_name);
 
 private:
-  std::unordered_map<string, sk_sp<SkTypeface>> file_to_typeface_mapping;
+  std::unordered_map<std::string, sk_sp<SkTypeface>> file_to_typeface_mapping;
 };
-}  // namespace WRESkiaRendering
+}  // namespace wre_skia

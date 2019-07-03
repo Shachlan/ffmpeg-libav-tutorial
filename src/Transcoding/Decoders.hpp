@@ -35,7 +35,7 @@ struct Decoder {
 
 protected:
   /// Concrete implementation of the decoding class.
-  unique_ptr<Impl> decoder_implementation;
+  std::unique_ptr<Impl> decoder_implementation;
 };
 
 /// Decoder of audio streams.
@@ -50,7 +50,7 @@ struct AudioDecoder : Decoder {
   /// @param duration - duration, in seconds, of the resulting decoded frames. If \c
   /// start_from + \c duration is larger than the duration of the stream, the decoder will decode
   /// until the end of the stream and stop, thus resulting in a shorter than requested duration.
-  AudioDecoder(string file_name, double start_from = 0, double duration = UINT32_MAX);
+  AudioDecoder(std::string file_name, double start_from = 0, double duration = UINT32_MAX);
 
   /// Returns the transcoding components from which the codec parameters of the decoder can be
   /// received.
@@ -83,7 +83,7 @@ struct VideoDecoder : Decoder {
   /// and for each source frame has a timestamp of T, then the decoded frames will be mapped to X'=
   /// \c duration, Z' = \c expected_framerate, Y' = ~ X' / (Z' * speed_ratio), T' = (T - \c
   /// start_from) / speed_ratio.
-  VideoDecoder(string file_name, double expected_framerate = 0, double start_from = 0,
+  VideoDecoder(std::string file_name, double expected_framerate = 0, double start_from = 0,
                double duration = UINT32_MAX, double speed_ratio = 1);
 
   /// Calls the given \c buffer_read function over the internal RGB buffer, sized 3 * width *
@@ -111,7 +111,7 @@ struct VideoDecoder : Decoder {
 
 private:
   /// Converter between the video's native pixel format and packed RGB format.
-  unique_ptr<VideoFormatConverter> video_conversion_context;
+  std::unique_ptr<VideoFormatConverter> video_conversion_context;
 };
 
 }  // namespace WRETranscoding

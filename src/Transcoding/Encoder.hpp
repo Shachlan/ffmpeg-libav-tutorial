@@ -24,7 +24,7 @@ public:
   /// Opens the file at \c file_name for audio-video encoding. The video will be encoded using \c
   /// video_codec_name codec, with resolution of \c video_width x \c video_height, with \c
   /// video_framerate. \c audio_decoder will be used to initialize the internal audio decoder.
-  Encoder(string file_name, string video_codec_name, int video_width, int video_height,
+  Encoder(std::string file_name, std::string video_codec_name, int video_width, int video_height,
           double video_framerate, const TranscodingComponents *audio_decoder);
   ~Encoder();
 
@@ -64,16 +64,16 @@ public:
 
 private:
   /// Encoder for video frames.
-  unique_ptr<TranscodingComponents> video_encoder;
+  std::unique_ptr<TranscodingComponents> video_encoder;
 
   /// Encoder for audio frames.
-  unique_ptr<TranscodingComponents> audio_encoder;
+  std::unique_ptr<TranscodingComponents> audio_encoder;
 
   /// Wrapper for the encoded file.
   AVFormatContext *format_context;
 
   /// Context for converting RGB frames into the format used by \c video_encoder.
-  unique_ptr<VideoFormatConverter> video_conversion_context;
+  std::unique_ptr<VideoFormatConverter> video_conversion_context;
 };
 
 }  // namespace WRETranscoding

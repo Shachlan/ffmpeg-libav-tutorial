@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-using std::string;
 
 /// This file presents flexible, non-intrusive logging macros that can be efficiently enabled or
 /// disabled via compile switches.
@@ -68,4 +67,4 @@ using std::string;
 
 /// Default logging call. This method shouldn't be called directly, but rather called through the
 /// macros given above.
-void log(const string fmt, const string log_level, ...);
+void log(const std::string fmt, const std::string log_level, ...);

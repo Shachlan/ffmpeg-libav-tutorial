@@ -5,7 +5,7 @@
 
 #include "base/BaseException.hpp"
 
-namespace WRESkiaRendering {
+namespace wre_skia {
 DefineException(SkiaException);
 
-}  // namespace WRESkiaRendering
+}  // namespace wre_skia

@@ -33,7 +33,7 @@ struct Decoder::Impl : TranscodingComponents {
   ///
   /// @param speed_ratio - the ratio between the speed of the original stream and of the
   /// decoded frames.
-  Impl(string file_name, double start_from, double duration, double speed_ratio,
+  Impl(std::string file_name, double start_from, double duration, double speed_ratio,
        AVMediaType media_type) {
     format_context = avformat_alloc_context();
     if (!format_context) {
@@ -54,14 +54,14 @@ struct Decoder::Impl : TranscodingComponents {
       throw TranscodingException("could not get the stream index with error %d", stream_index);
     }
 
-    stream = wrap_with_empty_deleter<AVStream>(format_context->streams[stream_index]);
-    codec = wrap_with_empty_deleter<AVCodec>(avcodec_find_decoder(stream->codecpar->codec_id));
+    stream = format_context->streams[stream_index];
+    codec = avcodec_find_decoder(stream->codecpar->codec_id);
     context = create_codec_context(codec);
     if (avcodec_parameters_to_context(context.get(), stream->codecpar) < 0) {
       throw TranscodingException("failed to copy codec params to codec context");
     }
 
-    if (avcodec_open2(context.get(), codec.get(), NULL) < 0) {
+    if (avcodec_open2(context.get(), codec, NULL) < 0) {
       throw TranscodingException("failed to open codec through avcodec_open2");
     }
 
@@ -170,8 +170,8 @@ struct VideoDecoderImplementation : Decoder::Impl {
   ///
   /// @param speed_ratio - the ratio between the speed of the original stream and of the
   /// decoded frames.
-  VideoDecoderImplementation(string file_name, AVRational expected_framerate, double start_from,
-                             double duration, double speed_ratio)
+  VideoDecoderImplementation(std::string file_name, AVRational expected_framerate,
+                             double start_from, double duration, double speed_ratio)
       : Decoder::Impl(file_name, start_from, duration, speed_ratio, AVMEDIA_TYPE_VIDEO) {
     if (expected_framerate.num == 0) {
       expected_framerate = stream->avg_frame_rate;
@@ -188,7 +188,7 @@ struct VideoDecoderImplementation : Decoder::Impl {
     next_timestamp = 0;
   }
 
-  shared_ptr<AVFrame> frame_to_use() {
+  std::shared_ptr<AVFrame> frame_to_use() {
     auto previous_distance = abs(next_timestamp - previous_decoded_frame->pts);
     auto latest_distance = abs(next_timestamp - latest_decoded_frame->pts);
     return previous_distance > latest_distance ? latest_decoded_frame : previous_decoded_frame;
@@ -228,7 +228,7 @@ struct VideoDecoderImplementation : Decoder::Impl {
   }
 
 private:
-  void copy_frame(shared_ptr<AVFrame> dst, const shared_ptr<AVFrame> src) noexcept {
+  void copy_frame(std::shared_ptr<AVFrame> dst, const std::shared_ptr<AVFrame> src) noexcept {
     av_frame_copy(dst.get(), src.get());
     av_frame_copy_props(dst.get(), src.get());
   }
@@ -246,8 +246,11 @@ private:
 
   /// Latest read frame. This frame is saved in order to duplicate it, in case the expected frame
   /// rate requires it.
-  shared_ptr<AVFrame> latest_decoded_frame;
-  shared_ptr<AVFrame> previous_decoded_frame;
+  std::shared_ptr<AVFrame> latest_decoded_frame;
+
+  /// The frame that was read before the latest read frame. This frame is saved in order to
+  /// duplicate it, in case the expected frame rate requires it.
+  std::shared_ptr<AVFrame> previous_decoded_frame;
 
   /// Timestamp of the next sent frame.
   long next_timestamp;
@@ -280,7 +283,7 @@ int Decoder::decode_next_frame() noexcept {
 #pragma endregion Decoder
 #pragma region AudioDecoder
 
-AudioDecoder::AudioDecoder(string file_name, double start_from, double duration) {
+AudioDecoder::AudioDecoder(std::string file_name, double start_from, double duration) {
   log_info("Open audio decoder from: %s", file_name.c_str());
   decoder_implementation =
       std::make_unique<Decoder::Impl>(file_name, start_from, duration, 1, AVMEDIA_TYPE_AUDIO);
@@ -293,7 +296,7 @@ TranscodingComponents *AudioDecoder::get_transcoding_components() const noexcept
 #pragma endregion AudioDecoder
 #pragma region VideoDecoder
 
-VideoDecoder::VideoDecoder(string file_name, double expected_framerate, double start_from,
+VideoDecoder::VideoDecoder(std::string file_name, double expected_framerate, double start_from,
                            double duration, double speed_ratio) {
   log_info("Open video decoder from: %s", file_name.c_str());
   decoder_implementation = std::make_unique<VideoDecoderImplementation>(

@@ -19,7 +19,7 @@ namespace wre_opengl {
 /// Checks whether OpenGL contains errors, and throws a\c GLException if there are any.
 /// The thrown exception's description will contain the OpenGL errors, and \c format and the
 /// additional arguments.
-void check_gl_errors(string format, ...);
+void check_gl_errors(std::string format, ...);
 
 DefineException(GLException);
 

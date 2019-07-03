@@ -5,7 +5,7 @@
 
 #include <core/SkTypeface.h>
 
-sk_sp<SkTypeface> WRESkiaRendering::TypefaceFactory::get_typeface(string typeface_file_name) {
+sk_sp<SkTypeface> wre_skia::TypefaceFactory::get_typeface(std::string typeface_file_name) {
   auto iter = file_to_typeface_mapping.find(typeface_file_name);
 
   if (iter != file_to_typeface_mapping.end()) {

@@ -3,19 +3,19 @@
 
 #include "Transcoding/TranscodingComponents.hpp"
 
-shared_ptr<AVCodecContext> WRETranscoding::create_codec_context(shared_ptr<AVCodec> codec) {
-  return shared_ptr<AVCodecContext>(avcodec_alloc_context3(codec.get()),
-                                    [](AVCodecContext *context) {
-                                      if (context == nullptr) {
-                                        return;
-                                      }
-                                      avcodec_close(context);
-                                      avcodec_free_context(&context);
-                                    });
+std::shared_ptr<AVCodecContext> WRETranscoding::create_codec_context(AVCodec *codec) {
+  return std::shared_ptr<AVCodecContext>(avcodec_alloc_context3(codec),
+                                         [](AVCodecContext *context) {
+                                           if (context == nullptr) {
+                                             return;
+                                           }
+                                           avcodec_close(context);
+                                           avcodec_free_context(&context);
+                                         });
 }
 
-shared_ptr<AVFrame> WRETranscoding::create_frame() {
-  return shared_ptr<AVFrame>(av_frame_alloc(), [](AVFrame *frame) {
+std::shared_ptr<AVFrame> WRETranscoding::create_frame() {
+  return std::shared_ptr<AVFrame>(av_frame_alloc(), [](AVFrame *frame) {
     if (frame == nullptr) {
       return;
     }
@@ -24,8 +24,8 @@ shared_ptr<AVFrame> WRETranscoding::create_frame() {
   });
 }
 
-shared_ptr<AVPacket> WRETranscoding::create_packet() {
-  return shared_ptr<AVPacket>(av_packet_alloc(), [](AVPacket *packet) {
+std::shared_ptr<AVPacket> WRETranscoding::create_packet() {
+  return std::shared_ptr<AVPacket>(av_packet_alloc(), [](AVPacket *packet) {
     if (packet == nullptr) {
       return;
     }

@@ -8,8 +8,7 @@ using std::string;
 class Layer {
 public:
   enum class Type { Video, Text, Texture };
-  constexpr Layer(Type type) : type(type) {
-  }
+  constexpr Layer(Type type) : type(type) {}
 
   constexpr Type get_type() const noexcept {
     return type;
@@ -18,19 +17,18 @@ public:
 private:
   Type type;
 };
-using Layers = std::vector<shared_ptr<Layer>>;
+using Layers = std::vector<std::shared_ptr<Layer>>;
 
 class VideoLayer : public Layer {
 public:
-  VideoLayer(string file_name, double expected_framerate, double start_time, double duration,
+  VideoLayer(std::string file_name, double expected_framerate, double start_time, double duration,
              double speed_ratio)
       : Layer(Layer::Type::Video),
         file_name(std::move(file_name)),
         expected_framerate(expected_framerate),
         start_time(start_time),
         duration(duration),
-        speed_ratio(speed_ratio) {
-  }
+        speed_ratio(speed_ratio) {}
 
   string get_file_name() const noexcept {
     return file_name;
@@ -63,8 +61,7 @@ private:
 class TextureLayer : public Layer {
 public:
   constexpr TextureLayer(uint32_t source_texture)
-      : Layer(Layer::Type::Texture), source_texture(source_texture) {
-  }
+      : Layer(Layer::Type::Texture), source_texture(source_texture) {}
 
   constexpr uint32_t get_source_texture() const noexcept {
     return source_texture;
@@ -76,12 +73,11 @@ private:
 
 class TextLayer : public Layer {
 public:
-  TextLayer(string text, string &&font, int font_size)
+  TextLayer(std::string text, std::string &&font, int font_size)
       : Layer(Layer::Type::Text),
         text(std::move(text)),
         font(std::move(font)),
-        font_size(font_size) {
-  }
+        font_size(font_size) {}
 
   string get_text() const noexcept {
     return text;
@@ -104,5 +100,5 @@ private:
 class RenderingModel {
 public:
   explicit RenderingModel(json &&model);
-  unique_ptr<Layers> layers;
+  std::unique_ptr<Layers> layers;
 };

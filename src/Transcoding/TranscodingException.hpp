@@ -9,7 +9,7 @@ namespace WRETranscoding {
 
 class TranscodingException : public std::exception {
 public:
-  TranscodingException(string format, ...) {
+  TranscodingException(std::string format, ...) {
     format = "TranscodingException: " + format;
     va_list argList;
     va_start(argList, format);
@@ -17,12 +17,12 @@ public:
     va_end(argList);
   }
   /// Error message of the exception.
-  const char *what() const noexcept {
+  const char* what() const noexcept {
     return full_description;
   }
 
   /// Description of the error that caused the exception.
-  char *full_description;
+  char* full_description;
 };
 
 }  // namespace WRETranscoding

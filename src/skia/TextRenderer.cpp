@@ -4,25 +4,23 @@
 #include "TextRenderer.hpp"
 
 #include <core/SkFont.h>
+#include <core/SkSurface.h>
 #include <core/SkTextBlob.h>
 #include <core/SkTypeface.h>
-#include <core/SkSurface.h>
 #include <gpu/GrContext.h>
 
 #include "SkiaException.hpp"
-#include "SurfacePool.hpp"
 #include "TypefaceFactory.hpp"
 
-using WRESkiaRendering::TextRenderer;
+using wre_skia::TextRenderer;
 
-TextRenderer::TextRenderer(shared_ptr<TypefaceFactory> typeface_factory,
-                           shared_ptr<Surface> surface)
-    : surface(surface), typeface_factory(typeface_factory) {
-}
+TextRenderer::TextRenderer(std::shared_ptr<TypefaceFactory> typeface_factory,
+                           std::shared_ptr<Surface> surface)
+    : surface(surface), typeface_factory(typeface_factory) {}
 
-uint32_t TextRenderer::render_text(string text, TextRenderConfiguration configuration) {
-  surface->context->resetContext();
-  auto canvas = surface->surface->getCanvas();
+uint32_t TextRenderer::render_text(std::string text, TextRenderConfiguration configuration) {
+  surface->_context->resetContext();
+  auto canvas = surface->_surface->getCanvas();
   auto text_color = SkColor4f::FromColor(
       SkColorSetARGB(configuration.text_color[3], configuration.text_color[0],
                      configuration.text_color[1], configuration.text_color[2]));
@@ -37,5 +35,5 @@ uint32_t TextRenderer::render_text(string text, TextRenderConfiguration configur
   canvas->drawTextBlob(text_blob.get(), configuration.xCoord, configuration.yCoord, paint2);
   canvas->flush();
 
-  return surface->backing_texture->name;
+  return surface->_backing_texture._name;
 }

@@ -8,8 +8,8 @@
   class name : public std::exception {                       \
   public:                                                    \
     name() {}                                                \
-    name(string format, ...) {                               \
-      string name_str = #name;                               \
+    name(std::string format, ...) {                          \
+      std::string name_str = #name;                          \
       format = name_str + ": " + format;                     \
       va_list argList;                                       \
       va_start(argList, format);                             \

@@ -20,7 +20,7 @@ extern "C" {
 
 using namespace WRETranscoding;
 
-static json read_file(string file_name) {
+static json read_file(std::string file_name) {
   std::ifstream i(file_name);
   json j;
   i >> j;
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
 
     auto vector = *(render_model.layers.get());
     auto base_layer = vector.at(0);
-    shared_ptr<VideoLayer> layer = std::static_pointer_cast<VideoLayer>(base_layer);
+    std::shared_ptr<VideoLayer> layer = std::static_pointer_cast<VideoLayer>(base_layer);
     auto decoder =
         VideoDecoder(layer->get_file_name(), layer->get_expected_framerate(),
                      layer->get_start_time(), layer->get_duration(), layer->get_speed_ratio());
@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
     // auto secondary_decoder = VideoDecoder(argv[2], expected_framerate);
 
     log_info("audio decoder");
-    auto audio_decoder = AudioDecoder(argv[1], 1, 0);
+    auto audio_decoder = AudioDecoder(argv[1], layer->get_start_time(), layer->get_duration());
 
     auto encoder =
         Encoder(output_model.source, "libx264", width, height, layer->get_expected_framerate(),

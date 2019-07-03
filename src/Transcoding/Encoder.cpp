@@ -19,11 +19,10 @@ extern "C" {
 using namespace WRETranscoding;
 
 static int prepare_video_encoder(TranscodingComponents *encoder, AVFormatContext *format_context,
-                                 int width, int height, string codec_name,
+                                 int width, int height, std::string codec_name,
                                  AVRational expected_framerate) {
-  encoder->stream = wrap_with_empty_deleter<AVStream>(avformat_new_stream(format_context, NULL));
-  encoder->codec =
-      wrap_with_empty_deleter<AVCodec>(avcodec_find_encoder_by_name(codec_name.c_str()));
+  encoder->stream = avformat_new_stream(format_context, NULL);
+  encoder->codec = avcodec_find_encoder_by_name(codec_name.c_str());
 
   if (!encoder->codec) {
     log_error("could not find the proper codec");
@@ -50,7 +49,7 @@ static int prepare_video_encoder(TranscodingComponents *encoder, AVFormatContext
   encoder->context->framerate = expected_framerate;
   encoder->stream->time_base = encoder->context->time_base;
 
-  if (avcodec_open2(encoder->context.get(), encoder->codec.get(), NULL) < 0) {
+  if (avcodec_open2(encoder->context.get(), encoder->codec, NULL) < 0) {
     log_error("could not open the codec");
     return -1;
   }
@@ -69,8 +68,8 @@ static int prepare_video_encoder(TranscodingComponents *encoder, AVFormatContext
 
 static int prepare_audio_encoder(TranscodingComponents *encoder, AVFormatContext *format_context,
                                  const TranscodingComponents *decoder) {
-  encoder->stream = wrap_with_empty_deleter<AVStream>(avformat_new_stream(format_context, NULL));
-  encoder->codec = wrap_with_empty_deleter<AVCodec>(avcodec_find_encoder(decoder->codec->id));
+  encoder->stream = avformat_new_stream(format_context, NULL);
+  encoder->codec = avcodec_find_encoder(decoder->codec->id);
   encoder->frame = decoder->frame;
   encoder->packet = create_packet();
   avcodec_parameters_copy(encoder->stream->codecpar, decoder->stream->codecpar);
@@ -98,7 +97,7 @@ static int prepare_audio_encoder(TranscodingComponents *encoder, AVFormatContext
   encoder->context->channel_layout = AV_CH_LAYOUT_STEREO;
   encoder->context->channels = av_get_channel_layout_nb_channels(encoder->context->channel_layout);
 
-  if (avcodec_open2(encoder->context.get(), encoder->codec.get(), NULL) < 0) {
+  if (avcodec_open2(encoder->context.get(), encoder->codec, NULL) < 0) {
     log_error("could not open the audio codec");
     return -1;
   }
@@ -106,8 +105,9 @@ static int prepare_audio_encoder(TranscodingComponents *encoder, AVFormatContext
   return 0;
 }
 
-Encoder::Encoder(string file_name, string video_codec_name, int video_width, int video_height,
-                 double video_framerate, const TranscodingComponents *audio_decoder) {
+Encoder::Encoder(std::string file_name, std::string video_codec_name, int video_width,
+                 int video_height, double video_framerate,
+                 const TranscodingComponents *audio_decoder) {
   log_info("Opening encoder for %s", file_name.c_str());
   video_encoder = std::make_unique<TranscodingComponents>();
 

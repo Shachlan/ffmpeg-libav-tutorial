@@ -43,21 +43,21 @@ extern "C" {
 #include "DrawCall.hpp"
 #include "GLException.hpp"
 #include "ProgramPool.hpp"
-#include "SkiaWrappers/SurfacePool.hpp"
-#include "SkiaWrappers/TextRenderer.hpp"
-#include "SkiaWrappers/TypefaceFactory.hpp"
+#include "skia/Surface.hpp"
+#include "skia/TextRenderer.hpp"
+#include "skia/TypefaceFactory.hpp"
 
 using namespace wre_opengl;
-using WRESkiaRendering::SurfacePool;
+using std::shared_ptr;
+using std::string;
 
 static ProgramPool program_pool;
 
 static sk_sp<GrContext> skiaContext;
-static shared_ptr<WRESkiaRendering::Surface> text_surface;
-static shared_ptr<WRESkiaRendering::Surface> lottie_surface;
-static SurfacePool *surface_pool;
-static shared_ptr<WRESkiaRendering::TypefaceFactory> typeface_factory =
-    std::make_shared<WRESkiaRendering::TypefaceFactory>();
+static shared_ptr<wre_skia::Surface> text_surface;
+static shared_ptr<wre_skia::Surface> lottie_surface;
+static shared_ptr<wre_skia::TypefaceFactory> typeface_factory =
+    std::make_shared<wre_skia::TypefaceFactory>();
 
 typedef struct {
   GLuint position_buffer;
@@ -88,10 +88,10 @@ static const float position[12] = {-1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f,
 static const float textureCoords[12] = {0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
                                         0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f};
 
-static unique_ptr<Texture> texture = nullptr;
+static std::unique_ptr<Texture> texture = nullptr;
 
 GLuint get_texture() {
-  return texture->name;
+  return texture->_name;
 }
 
 static GLuint generate_vertex_array() {
@@ -107,7 +107,7 @@ static GLuint position_buffer_setup(GLuint program) {
   return positionBuf;
 }
 
-static GLuint texture_buffer_setup(GLuint program, string buffer_name) {
+static GLuint texture_buffer_setup(GLuint program, std::string buffer_name) {
   GLuint texturesBuffer;
   glGenBuffers(1, &texturesBuffer);
   return texturesBuffer;
@@ -164,18 +164,16 @@ void setupOpenGL(int width, int height, char *canvasName) {
   blend_program = build_blend_program();
 
   skiaContext = GrContext::MakeGL();
-  surface_pool = new SurfacePool(skiaContext, width, height);
-  text_surface = surface_pool->get_surface();
-  lottie_surface = surface_pool->get_surface();
-  log_info("textures: %u, %u", text_surface->backing_texture->name,
-           lottie_surface->backing_texture->name);
+  text_surface = std::make_shared<wre_skia::Surface>(width, height, skiaContext);
+  lottie_surface = std::make_shared<wre_skia::Surface>(width, height, skiaContext);
+  log_info("textures: %u, %u", text_surface->_backing_texture._name,
+           lottie_surface->_backing_texture._name);
 
   SkAutoGraphics ag;
 
   anim = skottie::Animation::Builder().makeFromFile("data.json");
 
-  texture =
-      Texture::make_texture(surface_pool->surface_width, surface_pool->surface_height, GL_RGB);
+  texture = std::make_unique<Texture>(width, height, GL_RGB);
 }
 
 void loadTexture(uint32_t texture_name, int width, int height, const uint8_t *buffer) {
@@ -217,22 +215,18 @@ void blendFrames(uint32_t texture1ID, uint32_t texture2ID, float blend_ratio) {
 void getCurrentResults(int width, int height, uint8_t *outputBuffer) {
   glBindVertexArray(0);
   glReadPixels(0, 0, width, height, PIXEL_FORMAT, GL_UNSIGNED_BYTE, outputBuffer);
-  surface_pool->release_surface(*text_surface.get());
-  surface_pool->release_surface(*lottie_surface.get());
-  text_surface = surface_pool->get_surface();
-  auto canvas = text_surface->surface->getCanvas();
+  auto canvas = text_surface->_surface->getCanvas();
   canvas->clear(SkColorSetARGB(255, 0, 0, 0));
 
-  lottie_surface = surface_pool->get_surface();
-  canvas = lottie_surface->surface->getCanvas();
+  canvas = lottie_surface->_surface->getCanvas();
   canvas->clear(SkColorSetARGB(255, 0, 0, 0));
 }
 
-uint32_t render_text(string text, int xCoord, int yCoord, int font_size) {
+uint32_t render_text(std::string text, int xCoord, int yCoord, int font_size) {
   glBindVertexArray(0);
-  auto text_renderer = WRESkiaRendering::TextRenderer(typeface_factory, text_surface);
+  auto text_renderer = wre_skia::TextRenderer(typeface_factory, text_surface);
   skiaContext->resetContext();
-  auto configuration = WRESkiaRendering::TextRenderConfiguration{
+  auto configuration = wre_skia::TextRenderConfiguration{
       "./fonts/pacifico/Pacifico.ttf", font_size, xCoord, yCoord, {255, 0, 0, 255}};
 
   return text_renderer.render_text(text, configuration);
@@ -254,7 +248,7 @@ uint32_t render_lottie(double time) {
   glBindVertexArray(0);
   skiaContext->resetContext();
 
-  auto canvas = lottie_surface->surface->getCanvas();
+  auto canvas = lottie_surface->_surface->getCanvas();
 
   {
     SkAutoCanvasRestore acr(canvas, true);
@@ -270,5 +264,5 @@ uint32_t render_lottie(double time) {
   }
 
   // log_debug("end render text");
-  return lottie_surface->backing_texture->name;
+  return lottie_surface->_backing_texture._name;
 }

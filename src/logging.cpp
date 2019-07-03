@@ -8,7 +8,7 @@
 
 using namespace boost::posix_time;
 
-void log(const string fmt, const string log_level, ...) {
+void log(const std::string fmt, const std::string log_level, ...) {
   va_list args;
   fprintf(stdout, "{\"level\": \"%s\",", log_level.c_str());
   ptime t = microsec_clock::universal_time();

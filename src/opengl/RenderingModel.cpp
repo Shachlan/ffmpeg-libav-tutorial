@@ -1,6 +1,6 @@
 #include "RenderingModel.hpp"
 
-using layer_ptr = shared_ptr<Layer>;
+using layer_ptr = std::shared_ptr<Layer>;
 
 static layer_ptr get_layer(json object) {
   auto type = object["type"];
@@ -22,7 +22,7 @@ static layer_ptr get_layer(json object) {
   throw std::runtime_error("unknown type: " + to_string(type));
 }
 
-static unique_ptr<Layers> get_layers(json layers_model) {
+static std::unique_ptr<Layers> get_layers(json layers_model) {
   auto vec = std::make_unique<Layers>();
   for (auto iter = layers_model.begin(); iter != layers_model.end(); iter++) {
     log_info("pushing");

@@ -9,6 +9,8 @@
 
 #include "OpenGLHeaders.hpp"
 
+using std::string;
+
 #if FRONTEND == 1
 
 static string blend_fragment = R"(#version 100
@@ -121,7 +123,7 @@ static GLuint build_shader(const GLchar *shader_source, GLenum shader_type) {
 
 #if FRONTEND == 1
 
-static string get_shader_text(string shader_name, GLenum shader_type) {
+static string get_shader_text(std::string shader_name, GLenum shader_type) {
   if (shader_type == GL_VERTEX_SHADER) {
     return passthrough_vertex;
   }
@@ -136,11 +138,11 @@ static string get_shader_text(string shader_name, GLenum shader_type) {
 
 #else
 
-static string get_shader_filename(string shader, GLenum shader_type) {
+static string get_shader_filename(std::string shader, GLenum shader_type) {
   return shader + (shader_type == GL_VERTEX_SHADER ? ".vsh" : ".fsh");
 }
 
-static string get_shader_text(string shader_name, GLenum shader_type) {
+static string get_shader_text(std::string shader_name, GLenum shader_type) {
   auto shader_file_name = get_shader_filename(shader_name, shader_type);
   std::ifstream stream(shader_file_name);
   if (!stream.is_open()) {
@@ -153,7 +155,7 @@ static string get_shader_text(string shader_name, GLenum shader_type) {
 
 #endif
 
-int build_shader(string shader_name, GLenum shader_type) {
+int build_shader(std::string shader_name, GLenum shader_type) {
   auto text = get_shader_text(shader_name, shader_type);
 
   return build_shader(text.c_str(), shader_type);
@@ -179,11 +181,11 @@ GLuint create_program(GLuint vertex_shader, GLuint fragment_shader) {
   return program;
 }
 
-string get_key(string vertex_shader, string fragment_shader) {
+string get_key(std::string vertex_shader, std::string fragment_shader) {
   return "vertx:" + vertex_shader + ".fragment:" + fragment_shader;
 }
 
-GLuint ProgramPool::get_program(string vertex_shader, string fragment_shader) {
+GLuint ProgramPool::get_program(std::string vertex_shader, std::string fragment_shader) {
   auto key = get_key(vertex_shader, fragment_shader);
   auto search = this->description_to_name_mapping.find(key);
   if (search != this->description_to_name_mapping.end()) {
